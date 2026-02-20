@@ -1,0 +1,35 @@
+# Android / Gradle
+.gradle/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Local environment
+local.properties
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Generated / tool outputs
+captures/
+.externalNativeBuild/
+.cxx/
+out/
+
+# Package / build artifacts
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+
+# Logs
+*.log
+hs_err_pid*
+replay_pid*
+
+# OS files
+.DS_Store
+Thumbs.db
