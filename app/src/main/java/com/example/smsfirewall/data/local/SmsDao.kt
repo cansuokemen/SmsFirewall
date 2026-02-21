@@ -18,6 +18,9 @@ interface SmsDao {
     @Query("SELECT * FROM sms_messages WHERE status = :status ORDER BY receivedAt DESC")
     fun getByStatus(status: String): Flow<List<SmsEntity>>
 
+    @Query("SELECT * FROM sms_messages WHERE status != :status ORDER BY receivedAt DESC")
+    fun getByStatusNot(status: String): Flow<List<SmsEntity>>
+
     @Delete
     suspend fun delete(sms: SmsEntity)
 }

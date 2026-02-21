@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.Button
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.Card
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,8 +27,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
@@ -37,13 +39,20 @@ import com.example.smsfirewall.notifications.NotificationConstants
 import com.example.smsfirewall.ui.theme.SmsFirewallTheme
 import kotlinx.coroutines.launch
 
+private enum class InboxTab(val title: String) {
+    MESSAGES("Mesajlar"),
+    SPAM("Spam")
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val blockedMessages by repository.getByStatus(SmsStatus.BLOCK).collectAsState(initial = emptyList())
+    val regularMessages by repository.getByStatusNot(SmsStatus.BLOCK).collectAsState(initial = emptyList())
+    val spamMessages by repository.getByStatus(SmsStatus.BLOCK).collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     var selectedForDelete by remember { mutableStateOf<SmsEntity?>(null) }
+    var selectedTab by remember { mutableStateOf(InboxTab.MESSAGES) }
     val shouldShowNotificationWarning = shouldShowNotificationPopupWarning(context)
 
     val openNotificationSettings: () -> Unit = {
@@ -60,6 +69,13 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
         context.startActivity(intent)
     }
 
+    val visibleMessages = if (selectedTab == InboxTab.MESSAGES) regularMessages else spamMessages
+    val emptyMessage = if (selectedTab == InboxTab.MESSAGES) {
+        "Mesaj bulunamadi"
+    } else {
+        "Spam bulunamadi"
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -69,19 +85,35 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
             NotificationWarningCard(onOpenSettings = openNotificationSettings)
         }
 
-        if (blockedMessages.isEmpty()) {
+        TabRow(
+            selectedTabIndex = selectedTab.ordinal,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            InboxTab.entries.forEach { tab ->
+                Tab(
+                    selected = selectedTab == tab,
+                    onClick = { selectedTab = tab },
+                    text = { Text(text = tab.title) }
+                )
+            }
+        }
+
+        if (visibleMessages.isEmpty()) {
             Text(
-                text = "Blocked messages not found",
+                text = emptyMessage,
                 modifier = Modifier.padding(top = 12.dp)
             )
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(blockedMessages, key = { it.id }) { sms ->
-                    BlockedSmsItem(
+                items(visibleMessages, key = { it.id }) { sms ->
+                    SmsListItem(
                         sms = sms,
+                        showReason = selectedTab == InboxTab.SPAM,
                         onLongPress = { selectedForDelete = sms }
                     )
                 }
@@ -93,7 +125,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
         AlertDialog(
             onDismissRequest = { selectedForDelete = null },
             title = { Text(text = "Delete message") },
-            text = { Text(text = "Delete selected blocked message?") },
+            text = { Text(text = "Delete selected message?") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -152,7 +184,11 @@ private fun shouldShowNotificationPopupWarning(context: android.content.Context)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun BlockedSmsItem(sms: SmsEntity, onLongPress: () -> Unit) {
+fun SmsListItem(
+    sms: SmsEntity,
+    showReason: Boolean,
+    onLongPress: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -162,18 +198,20 @@ fun BlockedSmsItem(sms: SmsEntity, onLongPress: () -> Unit) {
             )
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(text = "Sender: ${sms.sender}")
+            Text(text = "Sender: ${sms.sender.ifBlank { "Unknown sender" }}")
             Text(text = sms.body)
-            Text(text = "Reason: ${sms.reason}")
+            if (showReason) {
+                Text(text = "Reason: ${sms.reason}")
+            }
         }
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun BlockedSmsItemPreview() {
+fun SmsListItemPreview() {
     SmsFirewallTheme {
-        BlockedSmsItem(
+        SmsListItem(
             sms = SmsEntity(
                 id = 1,
                 sender = "+905551112233",
@@ -182,6 +220,7 @@ fun BlockedSmsItemPreview() {
                 status = SmsStatus.BLOCK,
                 reason = "Blocked keyword: winner"
             ),
+            showReason = true,
             onLongPress = {}
         )
     }

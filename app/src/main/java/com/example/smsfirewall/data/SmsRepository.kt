@@ -19,6 +19,10 @@ class SmsRepository(
         return smsDao.getByStatus(status)
     }
 
+    fun getByStatusNot(status: String): Flow<List<SmsEntity>> {
+        return smsDao.getByStatusNot(status)
+    }
+
     suspend fun delete(sms: SmsEntity) {
         smsDao.delete(sms)
     }
