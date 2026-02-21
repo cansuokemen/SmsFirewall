@@ -1,0 +1,416 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 0b2857e..e2325fe 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -2,6 +2,7 @@ plugins {
+     alias(libs.plugins.android.application)
+     alias(libs.plugins.kotlin.android)
+     alias(libs.plugins.kotlin.compose)
++    alias(libs.plugins.ksp)
+ }
+ 
+ android {
+@@ -45,6 +46,9 @@ dependencies {
+     implementation(libs.androidx.core.ktx)
+     implementation(libs.androidx.lifecycle.runtime.ktx)
+     implementation(libs.androidx.activity.compose)
++    implementation(libs.androidx.room.runtime)
++    implementation(libs.androidx.room.ktx)
++    ksp(libs.androidx.room.compiler)
+     implementation(platform(libs.androidx.compose.bom))
+     implementation(libs.androidx.compose.ui)
+     implementation(libs.androidx.compose.ui.graphics)
+@@ -57,4 +61,4 @@ dependencies {
+     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+     debugImplementation(libs.androidx.compose.ui.tooling)
+     debugImplementation(libs.androidx.compose.ui.test.manifest)
+-}
+\ No newline at end of file
++}
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index dedf7b1..4a7d1d4 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -2,12 +2,17 @@
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:tools="http://schemas.android.com/tools">
+ 
++    <uses-feature
++        android:name="android.hardware.telephony"
++        android:required="false" />
++
+     <uses-permission android:name="android.permission.RECEIVE_SMS" />
+     <uses-permission android:name="android.permission.READ_SMS" />
+     <uses-permission android:name="android.permission.SEND_SMS" />
+     <uses-permission android:name="android.permission.RECEIVE_MMS" />
+     <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" />
+     <uses-permission android:name="android.permission.WRITE_SMS" />
++    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+ 
+     <application
+         android:allowBackup="true"
+@@ -26,6 +31,7 @@
+             <intent-filter>
+                 <action android:name="android.intent.action.MAIN" />
+                 <category android:name="android.intent.category.LAUNCHER" />
++                <category android:name="android.intent.category.APP_MESSAGING" />
+             </intent-filter>
+ 
+             <!-- SMS app listesinde görünmek için -->
+@@ -57,7 +63,11 @@
+             android:permission="android.permission.SEND_RESPOND_VIA_MESSAGE">
+             <intent-filter>
+                 <action android:name="android.intent.action.RESPOND_VIA_MESSAGE" />
++                <category android:name="android.intent.category.DEFAULT" />
++                <data android:scheme="sms" />
+                 <data android:scheme="smsto" />
++                <data android:scheme="mms" />
++                <data android:scheme="mmsto" />
+             </intent-filter>
+         </service>
+ 
+@@ -82,4 +92,4 @@
+ 
+     </application>
+ 
+-</manifest>
+\ No newline at end of file
++</manifest>
+diff --git a/app/src/main/java/com/example/smsfirewall/MainActivity.kt b/app/src/main/java/com/example/smsfirewall/MainActivity.kt
+index 4f3b57f..2c115f4 100644
+--- a/app/src/main/java/com/example/smsfirewall/MainActivity.kt
++++ b/app/src/main/java/com/example/smsfirewall/MainActivity.kt
+@@ -1,69 +1,143 @@
+ package com.example.smsfirewall
+ 
++import android.Manifest
+ import android.app.role.RoleManager
+ import android.content.Intent
++import android.content.pm.PackageManager
+ import android.os.Build
+ import android.os.Bundle
+ import android.provider.Telephony
+ import androidx.activity.ComponentActivity
+ import androidx.activity.compose.setContent
+ import androidx.activity.enableEdgeToEdge
++import androidx.activity.result.contract.ActivityResultContracts
++import androidx.core.content.ContextCompat
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.material3.Scaffold
+-import androidx.compose.material3.Text
+-import androidx.compose.runtime.Composable
+ import androidx.compose.ui.Modifier
+-import androidx.compose.ui.tooling.preview.Preview
++import com.example.smsfirewall.data.DatabaseProvider
++import com.example.smsfirewall.data.SmsRepository
++import com.example.smsfirewall.ui.inbox.BlockedSmsScreen
+ import com.example.smsfirewall.ui.theme.SmsFirewallTheme
+ 
+ class MainActivity : ComponentActivity() {
++    private var uiStarted = false
++    private var requestInFlight = false
++    private var requestAttempted = false
++    private lateinit var smsRepository: SmsRepository
++
++    private val defaultSmsRequestLauncher =
++        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
++            requestInFlight = false
++            if (isDefaultSmsApp()) {
++                startUiIfNeeded()
++            } else {
++                finish()
++            }
++        }
++
++    private val notificationPermissionLauncher =
++        registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
++
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
++        smsRepository = SmsRepository(DatabaseProvider.getDatabase(this).smsDao())
++        continueOnlyIfDefaultSms()
++    }
++
++    override fun onResume() {
++        super.onResume()
++        if (!uiStarted && !requestInFlight) {
++            continueOnlyIfDefaultSms()
++        }
++    }
++
++    private fun continueOnlyIfDefaultSms() {
++        if (isDefaultSmsApp()) {
++            startUiIfNeeded()
++            return
++        }
++
++        requestDefaultSmsRoleOrFinish()
++    }
++
++    private fun isDefaultSmsApp(): Boolean {
++        val hasTelephony =
++            packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEPHONY)
++        if (!hasTelephony) return true
++
++        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
++            val roleManager = getSystemService(RoleManager::class.java)
++            roleManager?.isRoleHeld(RoleManager.ROLE_SMS) == true
++        } else {
++            Telephony.Sms.getDefaultSmsPackage(this) == packageName
++        }
++    }
+ 
+-        // Default SMS rolünü isteme (API 29+)
+-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
++    private fun requestDefaultSmsRoleOrFinish() {
++        val hasTelephony =
++            packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEPHONY)
++        if (!hasTelephony) {
++            finish()
++            return
++        }
++
++        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+             val roleManager = getSystemService(RoleManager::class.java)
+-            if (roleManager != null &&
+-                roleManager.isRoleAvailable(RoleManager.ROLE_SMS) &&
+-                !roleManager.isRoleHeld(RoleManager.ROLE_SMS)
+-            ) {
+-                val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS)
+-                startActivity(intent)
++            if (roleManager == null || !roleManager.isRoleAvailable(RoleManager.ROLE_SMS)) {
++                null
++            } else {
++                roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS)
+             }
+         } else {
+-            // Eski Android sürümleri için fallback
+-            val myPackage = packageName
+-            val currentDefault = Telephony.Sms.getDefaultSmsPackage(this)
+-            if (currentDefault != myPackage) {
+-                val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).apply {
+-                    putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, myPackage)
+-                }
+-                startActivity(intent)
++            Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).apply {
++                putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
+             }
+         }
+ 
++        if (intent == null) {
++            finish()
++            return
++        }
++
++        if (requestAttempted) {
++            finish()
++            return
++        }
++
++        requestAttempted = true
++        requestInFlight = true
++        defaultSmsRequestLauncher.launch(intent)
++    }
++
++    private fun startUiIfNeeded() {
++        if (uiStarted) return
++        uiStarted = true
+         enableEdgeToEdge()
+         setContent {
+             SmsFirewallTheme {
+                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+-                    Greeting(
+-                        name = "Android",
++                    BlockedSmsScreen(
++                        repository = smsRepository,
+                         modifier = Modifier.padding(innerPadding)
+                     )
+                 }
+             }
+         }
++        requestNotificationPermissionIfNeeded()
+     }
+-}
+ 
+-@Composable
+-fun Greeting(name: String, modifier: Modifier = Modifier) {
+-    Text(text = "Hello $name!", modifier = modifier)
+-}
++    private fun requestNotificationPermissionIfNeeded() {
++        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+ 
+-@Preview(showBackground = true)
+-@Composable
+-fun GreetingPreview() {
+-    SmsFirewallTheme { Greeting("Android") }
+-}
+\ No newline at end of file
++        val granted = ContextCompat.checkSelfPermission(
++            this,
++            Manifest.permission.POST_NOTIFICATIONS
++        ) == PackageManager.PERMISSION_GRANTED
++
++        if (!granted) {
++            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
++        }
++    }
++}
+diff --git a/app/src/main/java/com/example/smsfirewall/SmsReceiver.kt b/app/src/main/java/com/example/smsfirewall/SmsReceiver.kt
+index a01d9a4..25e6fc0 100644
+--- a/app/src/main/java/com/example/smsfirewall/SmsReceiver.kt
++++ b/app/src/main/java/com/example/smsfirewall/SmsReceiver.kt
+@@ -1,10 +1,114 @@
+ package com.example.smsfirewall
+ 
++import android.Manifest
++import android.app.NotificationChannel
++import android.app.NotificationManager
++import android.app.PendingIntent
+ import android.content.BroadcastReceiver
+ import android.content.Context
+ import android.content.Intent
++import android.content.pm.PackageManager
++import android.os.Build
++import android.provider.Telephony
++import androidx.core.app.NotificationCompat
++import androidx.core.app.NotificationManagerCompat
++import androidx.core.content.ContextCompat
++import com.example.smsfirewall.data.DatabaseProvider
++import com.example.smsfirewall.data.SmsRepository
++import com.example.smsfirewall.data.local.SmsEntity
++import com.example.smsfirewall.filter.SmsFilterEngine
++import com.example.smsfirewall.filter.SmsStatus
++import com.example.smsfirewall.notifications.NotificationConstants
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.SupervisorJob
++import kotlinx.coroutines.launch
+ 
+ class SmsReceiver : BroadcastReceiver() {
+     override fun onReceive(context: Context, intent: Intent) {
++        val action = intent.action ?: return
++        if (action != Telephony.Sms.Intents.SMS_DELIVER_ACTION) {
++            return
++        }
++
++        val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
++        if (messages.isEmpty()) return
++
++        val sender = messages.firstOrNull()?.displayOriginatingAddress.orEmpty()
++        val body = messages.joinToString(separator = "") { message ->
++            message.messageBody.orEmpty()
++        }
++        val receivedAt = messages.firstOrNull()?.timestampMillis ?: System.currentTimeMillis()
++
++        val filterEngine = SmsFilterEngine(
++            blockedKeywords = setOf("free", "winner", "loan", "debt", "credit")
++        )
++        val decision = filterEngine.evaluate(sender = sender, body = body)
++
++        val pendingResult = goAsync()
++        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
++            try {
++                val repository = SmsRepository(
++                    DatabaseProvider.getDatabase(context).smsDao()
++                )
++                repository.insert(
++                    SmsEntity(
++                        sender = sender,
++                        body = body,
++                        receivedAt = receivedAt,
++                        status = decision.status.ifBlank { SmsStatus.REVIEW },
++                        reason = decision.reason
++                    )
++                )
++                if (decision.status != SmsStatus.BLOCK) {
++                    showAllowedSmsNotification(context, sender, body)
++                }
++            } finally {
++                pendingResult.finish()
++            }
++        }
++    }
++
++    private fun showAllowedSmsNotification(context: Context, sender: String, body: String) {
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
++            ContextCompat.checkSelfPermission(
++                context,
++                Manifest.permission.POST_NOTIFICATIONS
++            ) != PackageManager.PERMISSION_GRANTED
++        ) {
++            return
++        }
++
++        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++            val channel = NotificationChannel(
++                NotificationConstants.ALLOWED_SMS_CHANNEL_ID,
++                "Allowed SMS",
++                NotificationManager.IMPORTANCE_DEFAULT
++            )
++            manager.createNotificationChannel(channel)
++        }
++
++        val openAppIntent = Intent(context, MainActivity::class.java).apply {
++            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
++        }
++        val pendingIntent = PendingIntent.getActivity(
++            context,
++            0,
++            openAppIntent,
++            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
++        )
++
++        val notification = NotificationCompat.Builder(context, NotificationConstants.ALLOWED_SMS_CHANNEL_ID)
++            .setSmallIcon(android.R.drawable.ic_dialog_email)
++            .setContentTitle(sender.ifBlank { "Unknown sender" })
++            .setContentText(body.ifBlank { "New SMS received" })
++            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
++            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
++            .setAutoCancel(true)
++            .setContentIntent(pendingIntent)
++            .build()
++
++        NotificationManagerCompat.from(context).notify(System.currentTimeMillis().toInt(), notification)
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/gradle/libs.versions.toml b/gradle/libs.versions.toml
+index 120cdf5..9b6ce96 100644
+--- a/gradle/libs.versions.toml
++++ b/gradle/libs.versions.toml
+@@ -1,6 +1,7 @@
+ [versions]
+ agp = "8.13.2"
+ kotlin = "2.0.21"
++ksp = "2.0.21-1.0.27"
+ coreKtx = "1.10.1"
+ junit = "4.13.2"
+ junitVersion = "1.1.5"
+@@ -8,6 +9,7 @@ espressoCore = "3.5.1"
+ lifecycleRuntimeKtx = "2.6.1"
+ activityCompose = "1.12.0"
+ composeBom = "2024.09.00"
++room = "2.6.1"
+ 
+ [libraries]
+ androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+@@ -24,9 +26,13 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
+ androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+ androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+ androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
++androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
++androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
++androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+ 
+ [plugins]
+ android-application = { id = "com.android.application", version.ref = "agp" }
+ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
++ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+ 
+diff --git a/gradlew b/gradlew
+old mode 100755
+new mode 100644
