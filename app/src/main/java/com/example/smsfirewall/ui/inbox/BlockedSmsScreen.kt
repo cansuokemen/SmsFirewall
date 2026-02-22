@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,6 +30,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
@@ -189,19 +191,39 @@ fun SmsListItem(
     showReason: Boolean,
     onLongPress: () -> Unit
 ) {
+    val bodyMaxLines = if (showReason) 2 else 4
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .height(120.dp)
             .combinedClickable(
                 onClick = {},
                 onLongClick = onLongPress
             )
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(text = "Sender: ${sms.sender.ifBlank { "Unknown sender" }}")
-            Text(text = sms.body)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = "Sender: ${sms.sender.ifBlank { "Unknown sender" }}",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = sms.body,
+                maxLines = bodyMaxLines,
+                overflow = TextOverflow.Ellipsis
+            )
             if (showReason) {
-                Text(text = "Reason: ${sms.reason}")
+                Text(
+                    text = "Reason: ${sms.reason}",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
