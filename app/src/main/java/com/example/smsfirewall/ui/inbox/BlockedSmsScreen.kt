@@ -247,10 +247,13 @@ fun SmsListItem(
         confirmValueChange = { value ->
             when (value) {
                 SwipeToDismissBoxValue.EndToStart -> {
-                    if (!actionsVisible) {
+                    if (actionsVisible) {
+                        onSwipeDelete()
+                        true
+                    } else {
                         actionsVisible = true
+                        false
                     }
-                    false
                 }
                 SwipeToDismissBoxValue.StartToEnd -> {
                     actionsVisible = false
