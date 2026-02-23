@@ -37,6 +37,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -69,6 +70,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     val regularMessages by repository.getByStatusNot(SmsStatus.BLOCK).collectAsState(initial = emptyList())
     val spamMessages by repository.getByStatus(SmsStatus.BLOCK).collectAsState(initial = emptyList())
     val mutedSenderStore = remember(context) { MutedSenderStore(context) }
+    var mutedSendersChangeToken by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     var selectedForDelete by remember { mutableStateOf<SmsEntity?>(null) }
     var selectedTab by remember { mutableStateOf(InboxTab.MESSAGES) }
@@ -130,8 +132,12 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(visibleMessages, key = { it.id }) { sms ->
+                    val isSenderMuted = remember(sms.sender, mutedSendersChangeToken) {
+                        mutedSenderStore.isMuted(sms.sender)
+                    }
                     SmsListItem(
                         sms = sms,
+                        isNotificationsMuted = isSenderMuted,
                         showReason = selectedTab == InboxTab.SPAM,
                         onLongPress = { selectedForDelete = sms },
                         onSwipeDelete = {
@@ -141,9 +147,19 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                         },
                         onMuteNotifications = {
                             mutedSenderStore.mute(sms.sender)
+                            mutedSendersChangeToken++
                             Toast.makeText(
                                 context,
                                 "Bu gonderici icin bildirim kapatildi",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        onUnmuteNotifications = {
+                            mutedSenderStore.unmute(sms.sender)
+                            mutedSendersChangeToken++
+                            Toast.makeText(
+                                context,
+                                "Bu gonderici icin bildirim yeniden acildi",
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
@@ -218,10 +234,12 @@ private fun shouldShowNotificationPopupWarning(context: android.content.Context)
 @Composable
 fun SmsListItem(
     sms: SmsEntity,
+    isNotificationsMuted: Boolean,
     showReason: Boolean,
     onLongPress: () -> Unit,
     onSwipeDelete: () -> Unit,
-    onMuteNotifications: () -> Unit
+    onMuteNotifications: () -> Unit,
+    onUnmuteNotifications: () -> Unit
 ) {
     val bodyMaxLines = if (showReason) 2 else 4
     var actionsVisible by remember(sms.id) { mutableStateOf(false) }
@@ -229,13 +247,10 @@ fun SmsListItem(
         confirmValueChange = { value ->
             when (value) {
                 SwipeToDismissBoxValue.EndToStart -> {
-                    if (actionsVisible) {
-                        onSwipeDelete()
-                        true
-                    } else {
+                    if (!actionsVisible) {
                         actionsVisible = true
-                        false
                     }
+                    false
                 }
                 SwipeToDismissBoxValue.StartToEnd -> {
                     actionsVisible = false
@@ -317,14 +332,25 @@ fun SmsListItem(
                         .padding(end = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SwipeActionButton(
-                        iconRes = android.R.drawable.ic_lock_silent_mode,
-                        contentDescription = "Bildirimleri kapat",
-                        onClick = {
-                            actionsVisible = false
-                            onMuteNotifications()
-                        }
-                    )
+                    if (isNotificationsMuted) {
+                        SwipeActionButton(
+                            iconRes = android.R.drawable.ic_lock_silent_mode_off,
+                            contentDescription = "Bildirimi yeniden ac",
+                            onClick = {
+                                actionsVisible = false
+                                onUnmuteNotifications()
+                            }
+                        )
+                    } else {
+                        SwipeActionButton(
+                            iconRes = android.R.drawable.ic_lock_silent_mode,
+                            contentDescription = "Bildirimleri kapat",
+                            onClick = {
+                                actionsVisible = false
+                                onMuteNotifications()
+                            }
+                        )
+                    }
                     Spacer(modifier = Modifier.width(8.dp))
                     SwipeActionButton(
                         iconRes = android.R.drawable.ic_menu_delete,
@@ -367,10 +393,12 @@ fun SmsListItemPreview() {
                 status = SmsStatus.BLOCK,
                 reason = "Blocked keyword: winner"
             ),
+            isNotificationsMuted = false,
             showReason = true,
             onLongPress = {},
             onSwipeDelete = {},
-            onMuteNotifications = {}
+            onMuteNotifications = {},
+            onUnmuteNotifications = {}
         )
     }
 }

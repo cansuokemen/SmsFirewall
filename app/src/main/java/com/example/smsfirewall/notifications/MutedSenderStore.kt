@@ -35,6 +35,24 @@ class MutedSenderStore(context: Context) {
         return current.contains(normalizedSender)
     }
 
+    fun unmute(sender: String) {
+        val normalizedSender = normalizeSender(sender)
+        if (normalizedSender.isBlank()) return
+
+        val current = appContext
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .getStringSet(KEY_MUTED_SENDERS, emptySet())
+            .orEmpty()
+            .toMutableSet()
+        if (current.remove(normalizedSender)) {
+            appContext
+                .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putStringSet(KEY_MUTED_SENDERS, current)
+                .apply()
+        }
+    }
+
     private fun normalizeSender(sender: String): String {
         return sender
             .trim()
