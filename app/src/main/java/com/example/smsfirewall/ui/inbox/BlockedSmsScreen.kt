@@ -4,6 +4,7 @@ import android.app.NotificationManager
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -13,12 +14,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Tab
@@ -35,16 +43,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.notifications.NotificationConstants
+import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.ui.theme.SmsFirewallTheme
 import kotlinx.coroutines.launch
 
@@ -59,6 +68,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val regularMessages by repository.getByStatusNot(SmsStatus.BLOCK).collectAsState(initial = emptyList())
     val spamMessages by repository.getByStatus(SmsStatus.BLOCK).collectAsState(initial = emptyList())
+    val mutedSenderStore = remember(context) { MutedSenderStore(context) }
     val scope = rememberCoroutineScope()
     var selectedForDelete by remember { mutableStateOf<SmsEntity?>(null) }
     var selectedTab by remember { mutableStateOf(InboxTab.MESSAGES) }
@@ -128,6 +138,14 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                             scope.launch {
                                 repository.delete(sms)
                             }
+                        },
+                        onMuteNotifications = {
+                            mutedSenderStore.mute(sms.sender)
+                            Toast.makeText(
+                                context,
+                                "Bu gonderici icin bildirim kapatildi",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     )
                 }
@@ -202,69 +220,137 @@ fun SmsListItem(
     sms: SmsEntity,
     showReason: Boolean,
     onLongPress: () -> Unit,
-    onSwipeDelete: () -> Unit
+    onSwipeDelete: () -> Unit,
+    onMuteNotifications: () -> Unit
 ) {
     val bodyMaxLines = if (showReason) 2 else 4
+    var actionsVisible by remember(sms.id) { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) {
-                onSwipeDelete()
-                true
-            } else {
-                false
+            when (value) {
+                SwipeToDismissBoxValue.EndToStart -> {
+                    if (actionsVisible) {
+                        onSwipeDelete()
+                        true
+                    } else {
+                        actionsVisible = true
+                        false
+                    }
+                }
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    actionsVisible = false
+                    false
+                }
+                SwipeToDismissBoxValue.Settled -> false
             }
         }
     )
 
     SwipeToDismissBox(
         state = dismissState,
-        enableDismissFromStartToEnd = false,
+        enableDismissFromStartToEnd = true,
         enableDismissFromEndToStart = true,
         backgroundContent = {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Text(text = "Sil", color = Color.Red)
-            }
-        }
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-                .combinedClickable(
-                    onClick = {},
-                    onLongClick = onLongPress
-                )
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "Sender: ${sms.sender.ifBlank { "Unknown sender" }}",
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = sms.body,
-                    maxLines = bodyMaxLines,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (showReason) {
+            if (!actionsVisible) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = "Reason: ${sms.reason}",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        text = "Sola kaydir",
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
         }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .combinedClickable(
+                        onClick = {
+                            if (actionsVisible) {
+                                actionsVisible = false
+                            }
+                        },
+                        onLongClick = onLongPress
+                    )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Sender: ${sms.sender.ifBlank { "Unknown sender" }}",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = sms.body,
+                        maxLines = bodyMaxLines,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (showReason) {
+                        Text(
+                            text = "Reason: ${sms.reason}",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            if (actionsVisible) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SwipeActionButton(
+                        iconRes = android.R.drawable.ic_lock_silent_mode,
+                        contentDescription = "Bildirimleri kapat",
+                        onClick = {
+                            actionsVisible = false
+                            onMuteNotifications()
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    SwipeActionButton(
+                        iconRes = android.R.drawable.ic_menu_delete,
+                        contentDescription = "Mesaji sil",
+                        onClick = onSwipeDelete
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SwipeActionButton(
+    iconRes: Int,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    IconButton(
+        modifier = Modifier.size(44.dp),
+        onClick = onClick
+    ) {
+        Icon(
+            painter = painterResource(id = iconRes),
+            contentDescription = contentDescription
+        )
     }
 }
 
@@ -283,7 +369,8 @@ fun SmsListItemPreview() {
             ),
             showReason = true,
             onLongPress = {},
-            onSwipeDelete = {}
+            onSwipeDelete = {},
+            onMuteNotifications = {}
         )
     }
 }

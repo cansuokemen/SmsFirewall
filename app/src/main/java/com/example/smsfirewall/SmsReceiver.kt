@@ -19,6 +19,7 @@ import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.SmsFilterEngine
 import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.notifications.NotificationConstants
+import com.example.smsfirewall.notifications.MutedSenderStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -60,7 +61,8 @@ class SmsReceiver : BroadcastReceiver() {
                         reason = decision.reason
                     )
                 )
-                if (decision.status != SmsStatus.BLOCK) {
+                val mutedSenderStore = MutedSenderStore(context)
+                if (decision.status != SmsStatus.BLOCK && !mutedSenderStore.isMuted(sender)) {
                     showAllowedSmsNotification(context, sender, body)
                 }
             } finally {
