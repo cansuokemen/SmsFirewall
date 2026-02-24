@@ -333,8 +333,8 @@ private fun ConversationListItem(
                     .height(CONVERSATION_CARD_HEIGHT)
             ) {
                 Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -352,7 +352,7 @@ private fun ConversationListItem(
                             .fillMaxWidth()
                             .height(CONVERSATION_MESSAGES_HEIGHT),
                         reverseLayout = true,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(1.dp)
                     ) {
                         items(conversation.messages.asReversed(), key = { it.id }) { sms ->
                             MessageBubble(
@@ -421,8 +421,8 @@ private fun MessageBubble(
                 onClick = {},
                 onLongClick = onLongPress
             )
-            .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text(
             text = sms.body.ifBlank { "(Bos mesaj)" },
@@ -497,6 +497,6 @@ private fun ConversationListItemPreview() {
 }
 
 private const val PHONE_COMPARE_LENGTH = 10
-private val CONVERSATION_CARD_HEIGHT = 180.dp
-private val CONVERSATION_MESSAGES_HEIGHT = 128.dp
-private val MESSAGE_BUBBLE_HEIGHT = 56.dp
+private val CONVERSATION_CARD_HEIGHT = 152.dp
+private val CONVERSATION_MESSAGES_HEIGHT = 102.dp
+private val MESSAGE_BUBBLE_HEIGHT = 44.dp
