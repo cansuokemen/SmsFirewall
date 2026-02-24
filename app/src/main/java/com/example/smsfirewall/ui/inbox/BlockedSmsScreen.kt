@@ -51,6 +51,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.local.SmsEntity
@@ -334,7 +335,7 @@ private fun ConversationListItem(
             ) {
                 Column(
                     modifier = Modifier.padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -352,7 +353,7 @@ private fun ConversationListItem(
                             .fillMaxWidth()
                             .height(CONVERSATION_MESSAGES_HEIGHT),
                         reverseLayout = true,
-                        verticalArrangement = Arrangement.spacedBy(1.dp)
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         items(conversation.messages.asReversed(), key = { it.id }) { sms ->
                             MessageBubble(
@@ -421,18 +422,19 @@ private fun MessageBubble(
                 onClick = {},
                 onLongClick = onLongPress
             )
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         Text(
             text = sms.body.ifBlank { "(Bos mesaj)" },
+            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 14.sp),
             maxLines = bodyMaxLines,
             overflow = TextOverflow.Ellipsis
         )
         if (showReason) {
             Text(
                 text = "Reason: ${sms.reason}",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 14.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
