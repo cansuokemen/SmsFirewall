@@ -473,10 +473,11 @@ private fun ConversationDetailScreen(
 ) {
     var draftMessage by remember(conversation.senderKey) { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val displayMessages = remember(conversation.messages) { conversation.messages.asReversed() }
 
-    LaunchedEffect(conversation.messages.size) {
-        if (conversation.messages.isNotEmpty()) {
-            listState.scrollToItem(conversation.messages.lastIndex)
+    LaunchedEffect(displayMessages.size) {
+        if (displayMessages.isNotEmpty()) {
+            listState.scrollToItem(0)
         }
     }
 
@@ -490,6 +491,7 @@ private fun ConversationDetailScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .padding(top = 12.dp)
     ) {
         Row(
@@ -511,9 +513,10 @@ private fun ConversationDetailScreen(
                 .fillMaxWidth()
                 .weight(1f),
             state = listState,
+            reverseLayout = true,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            items(conversation.messages, key = { it.id }) { sms ->
+            items(displayMessages, key = { it.id }) { sms ->
                 DetailMessageBubble(
                     sms = sms,
                     onLongPress = { onMessageLongPress(sms) }
