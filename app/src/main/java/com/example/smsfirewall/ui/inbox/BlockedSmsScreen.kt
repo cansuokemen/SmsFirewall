@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -399,9 +400,11 @@ private fun MessageBubble(
     showReason: Boolean,
     onLongPress: () -> Unit
 ) {
+    val bodyMaxLines = if (showReason) 2 else 3
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .height(MESSAGE_BUBBLE_HEIGHT)
             .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .combinedClickable(
@@ -411,12 +414,18 @@ private fun MessageBubble(
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Text(text = sms.body.ifBlank { "(Bos mesaj)" })
+        Text(
+            text = sms.body.ifBlank { "(Bos mesaj)" },
+            maxLines = bodyMaxLines,
+            overflow = TextOverflow.Ellipsis
+        )
         if (showReason) {
             Text(
                 text = "Reason: ${sms.reason}",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -478,3 +487,4 @@ private fun ConversationListItemPreview() {
 }
 
 private const val PHONE_COMPARE_LENGTH = 10
+private val MESSAGE_BUBBLE_HEIGHT = 78.dp
