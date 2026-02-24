@@ -1,12 +1,17 @@
 package com.example.smsfirewall.ui.inbox
 
+import android.Manifest
 import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import android.telephony.SmsManager
 import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +26,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -28,6 +36,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Tab
@@ -36,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -46,13 +56,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.SmsStatus
@@ -78,6 +95,7 @@ private data class SmsConversation(
 @Composable
 fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val allMessages by repository.getAll().collectAsState(initial = emptyList())
     val regularMessages by repository.getByStatusNot(SmsStatus.BLOCK).collectAsState(initial = emptyList())
     val spamMessages by repository.getByStatus(SmsStatus.BLOCK).collectAsState(initial = emptyList())
     val mutedSenderStore = remember(context) { MutedSenderStore(context) }
@@ -85,6 +103,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     var selectedForDelete by remember { mutableStateOf<SmsEntity?>(null) }
     var selectedTab by remember { mutableStateOf(InboxTab.MESSAGES) }
+    var openedConversationKey by remember { mutableStateOf<String?>(null) }
     val shouldShowNotificationWarning = shouldShowNotificationPopupWarning(context)
 
     val openNotificationSettings: () -> Unit = {
@@ -103,10 +122,20 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
 
     val visibleMessages = if (selectedTab == InboxTab.MESSAGES) regularMessages else spamMessages
     val visibleConversations = remember(visibleMessages) { buildConversations(visibleMessages) }
+    val allConversations = remember(allMessages) { buildConversations(allMessages) }
+    val openedConversation = remember(openedConversationKey, allConversations) {
+        openedConversationKey?.let { key -> allConversations.firstOrNull { it.senderKey == key } }
+    }
     val emptyMessage = if (selectedTab == InboxTab.MESSAGES) {
         "Mesaj bulunamadi"
     } else {
         "Spam bulunamadi"
+    }
+
+    LaunchedEffect(openedConversationKey, openedConversation) {
+        if (openedConversationKey != null && openedConversation == null) {
+            openedConversationKey = null
+        }
     }
 
     Column(
@@ -131,7 +160,40 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
             }
         }
 
-        if (visibleConversations.isEmpty()) {
+        if (openedConversation != null) {
+            ConversationDetailScreen(
+                conversation = openedConversation,
+                onBack = { openedConversationKey = null },
+                onMessageLongPress = { sms -> selectedForDelete = sms },
+                onSendMessage = { messageBody ->
+                    val sender = openedConversation.displaySender
+                    scope.launch {
+                        val sent = sendSmsMessage(
+                            context = context,
+                            destinationAddress = sender,
+                            messageBody = messageBody
+                        )
+                        if (sent) {
+                            repository.insert(
+                                SmsEntity(
+                                    sender = sender,
+                                    body = messageBody,
+                                    receivedAt = System.currentTimeMillis(),
+                                    status = SmsStatus.ALLOW,
+                                    reason = SENT_MESSAGE_REASON
+                                )
+                            )
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "Mesaj gonderilemedi",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
+            )
+        } else if (visibleConversations.isEmpty()) {
             Text(
                 text = emptyMessage,
                 modifier = Modifier.padding(top = 12.dp)
@@ -151,6 +213,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                         conversation = conversation,
                         isNotificationsMuted = isSenderMuted,
                         showReason = selectedTab == InboxTab.SPAM,
+                        onOpenConversation = { openedConversationKey = conversation.senderKey },
                         onMessageLongPress = { sms -> selectedForDelete = sms },
                         onSwipeDeleteConversation = {
                             scope.launch {
@@ -292,6 +355,7 @@ private fun ConversationListItem(
     conversation: SmsConversation,
     isNotificationsMuted: Boolean,
     showReason: Boolean,
+    onOpenConversation: () -> Unit,
     onMessageLongPress: (SmsEntity) -> Unit,
     onSwipeDeleteConversation: () -> Unit,
     onMuteNotifications: () -> Unit,
@@ -332,6 +396,7 @@ private fun ConversationListItem(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(CONVERSATION_CARD_HEIGHT)
+                    .clickable(onClick = onOpenConversation)
             ) {
                 Column(
                     modifier = Modifier.padding(8.dp),
@@ -353,6 +418,7 @@ private fun ConversationListItem(
                         MessageBubble(
                             sms = latestMessage,
                             showReason = showReason,
+                            onClick = onOpenConversation,
                             onLongPress = { onMessageLongPress(latestMessage) }
                         )
                     }
@@ -399,9 +465,141 @@ private fun ConversationListItem(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
+private fun ConversationDetailScreen(
+    conversation: SmsConversation,
+    onBack: () -> Unit,
+    onMessageLongPress: (SmsEntity) -> Unit,
+    onSendMessage: (String) -> Unit
+) {
+    var draftMessage by remember(conversation.senderKey) { mutableStateOf("") }
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(conversation.messages.size) {
+        if (conversation.messages.isNotEmpty()) {
+            listState.scrollToItem(conversation.messages.lastIndex)
+        }
+    }
+
+    fun submitMessage() {
+        val text = draftMessage.trim()
+        if (text.isBlank()) return
+        onSendMessage(text)
+        draftMessage = ""
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = onBack) {
+                Text(text = "Geri")
+            }
+            Text(
+                text = conversation.displaySender,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            items(conversation.messages, key = { it.id }) { sms ->
+                DetailMessageBubble(
+                    sms = sms,
+                    onLongPress = { onMessageLongPress(sms) }
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = draftMessage,
+                onValueChange = { draftMessage = it },
+                modifier = Modifier
+                    .weight(1f)
+                    .onPreviewKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyUp &&
+                            (keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter)
+                        ) {
+                            submitMessage()
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { submitMessage() }),
+                placeholder = { Text(text = "Mesaj yaz") }
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(
+                onClick = { submitMessage() },
+                enabled = draftMessage.isNotBlank()
+            ) {
+                Text(text = "Gonder")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DetailMessageBubble(
+    sms: SmsEntity,
+    onLongPress: () -> Unit
+) {
+    val isOutgoing = sms.reason == SENT_MESSAGE_REASON
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (isOutgoing) Arrangement.End else Arrangement.Start
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .clip(MaterialTheme.shapes.medium)
+                .background(
+                    if (isOutgoing) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    }
+                )
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = onLongPress
+                )
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = sms.body.ifBlank { "(Bos mesaj)" },
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
 private fun MessageBubble(
     sms: SmsEntity,
     showReason: Boolean,
+    onClick: () -> Unit = {},
     onLongPress: () -> Unit
 ) {
     val bodyMaxLines = if (showReason) 1 else 2
@@ -412,7 +610,7 @@ private fun MessageBubble(
             .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .combinedClickable(
-                onClick = {},
+                onClick = onClick,
                 onLongClick = onLongPress
             )
             .padding(horizontal = 8.dp, vertical = 6.dp),
@@ -454,6 +652,34 @@ private fun SwipeActionButton(
     }
 }
 
+private fun sendSmsMessage(
+    context: Context,
+    destinationAddress: String,
+    messageBody: String
+): Boolean {
+    if (destinationAddress.isBlank() || messageBody.isBlank()) {
+        return false
+    }
+
+    val hasPermission = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.SEND_SMS
+    ) == PackageManager.PERMISSION_GRANTED
+    if (!hasPermission) {
+        return false
+    }
+
+    return runCatching {
+        SmsManager.getDefault().sendTextMessage(
+            destinationAddress,
+            null,
+            messageBody,
+            null,
+            null
+        )
+    }.isSuccess
+}
+
 @Preview(showBackground = true)
 @Composable
 private fun ConversationListItemPreview() {
@@ -484,6 +710,7 @@ private fun ConversationListItemPreview() {
             ),
             isNotificationsMuted = false,
             showReason = true,
+            onOpenConversation = {},
             onMessageLongPress = {},
             onSwipeDeleteConversation = {},
             onMuteNotifications = {},
@@ -493,5 +720,6 @@ private fun ConversationListItemPreview() {
 }
 
 private const val PHONE_COMPARE_LENGTH = 10
+private const val SENT_MESSAGE_REASON = "Sent by user"
 private val CONVERSATION_CARD_HEIGHT = 116.dp
 private val MESSAGE_BUBBLE_HEIGHT = 46.dp
