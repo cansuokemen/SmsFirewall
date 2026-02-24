@@ -348,20 +348,13 @@ private fun ConversationListItem(
                         )
                     }
 
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(CONVERSATION_MESSAGES_HEIGHT),
-                        reverseLayout = true,
-                        verticalArrangement = Arrangement.spacedBy(0.dp)
-                    ) {
-                        items(conversation.messages.asReversed(), key = { it.id }) { sms ->
-                            MessageBubble(
-                                sms = sms,
-                                showReason = showReason,
-                                onLongPress = { onMessageLongPress(sms) }
-                            )
-                        }
+                    val latestMessage = conversation.messages.lastOrNull()
+                    if (latestMessage != null) {
+                        MessageBubble(
+                            sms = latestMessage,
+                            showReason = showReason,
+                            onLongPress = { onMessageLongPress(latestMessage) }
+                        )
                     }
                 }
             }
@@ -428,6 +421,7 @@ private fun MessageBubble(
         Text(
             text = sms.body.ifBlank { "(Bos mesaj)" },
             style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 14.sp),
+            minLines = bodyMaxLines,
             maxLines = bodyMaxLines,
             overflow = TextOverflow.Ellipsis
         )
@@ -499,6 +493,5 @@ private fun ConversationListItemPreview() {
 }
 
 private const val PHONE_COMPARE_LENGTH = 10
-private val CONVERSATION_CARD_HEIGHT = 152.dp
-private val CONVERSATION_MESSAGES_HEIGHT = 102.dp
-private val MESSAGE_BUBBLE_HEIGHT = 44.dp
+private val CONVERSATION_CARD_HEIGHT = 116.dp
+private val MESSAGE_BUBBLE_HEIGHT = 46.dp
