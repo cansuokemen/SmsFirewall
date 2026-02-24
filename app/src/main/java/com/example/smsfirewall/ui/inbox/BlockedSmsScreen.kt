@@ -8,24 +8,32 @@ import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -142,6 +150,13 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                         isNotificationsMuted = isSenderMuted,
                         showReason = selectedTab == InboxTab.SPAM,
                         onMessageLongPress = { sms -> selectedForDelete = sms },
+                        onSwipeDeleteConversation = {
+                            scope.launch {
+                                conversation.messages.forEach { sms ->
+                                    repository.delete(sms)
+                                }
+                            }
+                        },
                         onMuteNotifications = {
                             mutedSenderStore.mute(conversation.displaySender)
                             mutedSendersChangeToken++
@@ -269,59 +284,107 @@ private fun normalizeSenderForGrouping(sender: String): String {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun ConversationListItem(
     conversation: SmsConversation,
     isNotificationsMuted: Boolean,
     showReason: Boolean,
     onMessageLongPress: (SmsEntity) -> Unit,
+    onSwipeDeleteConversation: () -> Unit,
     onMuteNotifications: () -> Unit,
     onUnmuteNotifications: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Sender: ${conversation.displaySender}",
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+    var actionsVisible by remember(conversation.senderKey) { mutableStateOf(false) }
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            when (value) {
+                SwipeToDismissBoxValue.EndToStart -> {
+                    if (actionsVisible) {
+                        onSwipeDeleteConversation()
+                        true
+                    } else {
+                        actionsVisible = true
+                        false
+                    }
+                }
 
-                if (isNotificationsMuted) {
-                    IconButton(
-                        onClick = onUnmuteNotifications
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    actionsVisible = false
+                    false
+                }
+
+                SwipeToDismissBoxValue.Settled -> false
+            }
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = true,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {}
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            painter = painterResource(id = android.R.drawable.ic_lock_silent_mode_off),
-                            contentDescription = "Bildirimi yeniden ac"
+                        Text(
+                            text = "Sender: ${conversation.displaySender}",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                } else {
-                    IconButton(
-                        onClick = onMuteNotifications
-                    ) {
-                        Icon(
-                            painter = painterResource(id = android.R.drawable.ic_lock_silent_mode),
-                            contentDescription = "Bildirimleri kapat"
-                        )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        conversation.messages.forEach { sms ->
+                            MessageBubble(
+                                sms = sms,
+                                showReason = showReason,
+                                onLongPress = { onMessageLongPress(sms) }
+                            )
+                        }
                     }
                 }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                conversation.messages.forEach { sms ->
-                    MessageBubble(
-                        sms = sms,
-                        showReason = showReason,
-                        onLongPress = { onMessageLongPress(sms) }
+            if (actionsVisible) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 10.dp, end = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (isNotificationsMuted) {
+                        SwipeActionButton(
+                            iconRes = android.R.drawable.ic_lock_silent_mode_off,
+                            contentDescription = "Bildirimi yeniden ac",
+                            onClick = {
+                                actionsVisible = false
+                                onUnmuteNotifications()
+                            }
+                        )
+                    } else {
+                        SwipeActionButton(
+                            iconRes = android.R.drawable.ic_lock_silent_mode,
+                            contentDescription = "Bildirimleri kapat",
+                            onClick = {
+                                actionsVisible = false
+                                onMuteNotifications()
+                            }
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    SwipeActionButton(
+                        iconRes = android.R.drawable.ic_menu_delete,
+                        contentDescription = "Konusmayi sil",
+                        onClick = onSwipeDeleteConversation
                     )
                 }
             }
@@ -359,6 +422,23 @@ private fun MessageBubble(
     }
 }
 
+@Composable
+private fun SwipeActionButton(
+    iconRes: Int,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    IconButton(
+        modifier = Modifier.size(44.dp),
+        onClick = onClick
+    ) {
+        Icon(
+            painter = painterResource(id = iconRes),
+            contentDescription = contentDescription
+        )
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 private fun ConversationListItemPreview() {
@@ -390,6 +470,7 @@ private fun ConversationListItemPreview() {
             isNotificationsMuted = false,
             showReason = true,
             onMessageLongPress = {},
+            onSwipeDeleteConversation = {},
             onMuteNotifications = {},
             onUnmuteNotifications = {}
         )
