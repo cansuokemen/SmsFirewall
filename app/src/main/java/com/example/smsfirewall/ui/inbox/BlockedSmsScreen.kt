@@ -13,6 +13,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -61,6 +62,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
@@ -473,6 +475,7 @@ private fun ConversationDetailScreen(
 ) {
     var draftMessage by remember(conversation.senderKey) { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val focusManager = LocalFocusManager.current
     val displayMessages = remember(conversation.messages) { conversation.messages.asReversed() }
 
     LaunchedEffect(displayMessages.size) {
@@ -492,6 +495,12 @@ private fun ConversationDetailScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                focusManager.clearFocus()
+            }
             .padding(top = 12.dp)
     ) {
         Row(
@@ -519,6 +528,7 @@ private fun ConversationDetailScreen(
             items(displayMessages, key = { it.id }) { sms ->
                 DetailMessageBubble(
                     sms = sms,
+                    onClick = { focusManager.clearFocus() },
                     onLongPress = { onMessageLongPress(sms) }
                 )
             }
@@ -565,6 +575,7 @@ private fun ConversationDetailScreen(
 @Composable
 private fun DetailMessageBubble(
     sms: SmsEntity,
+    onClick: () -> Unit = {},
     onLongPress: () -> Unit
 ) {
     val isOutgoing = sms.reason == SENT_MESSAGE_REASON
@@ -584,7 +595,7 @@ private fun DetailMessageBubble(
                     }
                 )
                 .combinedClickable(
-                    onClick = {},
+                    onClick = onClick,
                     onLongClick = onLongPress
                 )
                 .padding(horizontal = 10.dp, vertical = 8.dp)
