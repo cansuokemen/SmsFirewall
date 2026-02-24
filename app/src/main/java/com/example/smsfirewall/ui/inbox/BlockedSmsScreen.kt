@@ -268,22 +268,7 @@ fun SmsListItem(
         state = dismissState,
         enableDismissFromStartToEnd = true,
         enableDismissFromEndToStart = true,
-        backgroundContent = {
-            if (!actionsVisible) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Sola kaydir",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        }
+        backgroundContent = {}
     ) {
         Box(
             modifier = Modifier
