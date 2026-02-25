@@ -34,6 +34,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,8 +65,10 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -106,6 +109,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     var selectedForDelete by remember { mutableStateOf<SmsEntity?>(null) }
     var selectedTab by remember { mutableStateOf(InboxTab.MESSAGES) }
     var openedConversationKey by remember { mutableStateOf<String?>(null) }
+    var isNewMessageScreenOpen by remember { mutableStateOf(false) }
     val shouldShowNotificationWarning = shouldShowNotificationPopupWarning(context)
 
     val openNotificationSettings: () -> Unit = {
@@ -140,110 +144,173 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
         }
     }
 
-    Column(
+    suspend fun sendAndStoreMessage(destinationAddress: String, messageBody: String): Boolean {
+        val sent = sendSmsMessage(
+            context = context,
+            destinationAddress = destinationAddress,
+            messageBody = messageBody
+        )
+        if (!sent) {
+            return false
+        }
+
+        repository.insert(
+            SmsEntity(
+                sender = destinationAddress,
+                body = messageBody,
+                receivedAt = System.currentTimeMillis(),
+                status = SmsStatus.ALLOW,
+                reason = SENT_MESSAGE_REASON
+            )
+        )
+        return true
+    }
+
+    Box(
         modifier = modifier
             .fillMaxSize()
             .padding(12.dp)
     ) {
-        if (shouldShowNotificationWarning) {
-            NotificationWarningCard(onOpenSettings = openNotificationSettings)
-        }
-
-        TabRow(
-            selectedTabIndex = selectedTab.ordinal,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            InboxTab.entries.forEach { tab ->
-                Tab(
-                    selected = selectedTab == tab,
-                    onClick = { selectedTab = tab },
-                    text = { Text(text = tab.title) }
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (openedConversation != null) {
+                ConversationDetailScreen(
+                    conversation = openedConversation,
+                    onBack = { openedConversationKey = null },
+                    onMessageLongPress = { sms -> selectedForDelete = sms },
+                    onSendMessage = { messageBody ->
+                        val sender = openedConversation.displaySender
+                        scope.launch {
+                            val sent = sendAndStoreMessage(
+                                destinationAddress = sender,
+                                messageBody = messageBody
+                            )
+                            if (!sent) {
+                                Toast.makeText(
+                                    context,
+                                    "Mesaj gonderilemedi",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    }
                 )
+            } else if (isNewMessageScreenOpen) {
+                NewMessageScreen(
+                    onBack = { isNewMessageScreenOpen = false },
+                    onSendMessage = { destinationAddress, messageBody ->
+                        scope.launch {
+                            val sent = sendAndStoreMessage(
+                                destinationAddress = destinationAddress,
+                                messageBody = messageBody
+                            )
+                            if (sent) {
+                                Toast.makeText(
+                                    context,
+                                    "Mesaj gonderildi",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                isNewMessageScreenOpen = false
+                                selectedTab = InboxTab.MESSAGES
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "Mesaj gonderilemedi",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    }
+                )
+            } else {
+                if (shouldShowNotificationWarning) {
+                    NotificationWarningCard(onOpenSettings = openNotificationSettings)
+                }
+
+                TabRow(
+                    selectedTabIndex = selectedTab.ordinal,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    InboxTab.entries.forEach { tab ->
+                        Tab(
+                            selected = selectedTab == tab,
+                            onClick = { selectedTab = tab },
+                            text = { Text(text = tab.title) }
+                        )
+                    }
+                }
+
+                if (visibleConversations.isEmpty()) {
+                    Text(
+                        text = emptyMessage,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 12.dp, bottom = 84.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(visibleConversations, key = { it.senderKey }) { conversation ->
+                            val isSenderMuted = remember(conversation.senderKey, mutedSendersChangeToken) {
+                                mutedSenderStore.isMuted(conversation.displaySender)
+                            }
+                            ConversationListItem(
+                                conversation = conversation,
+                                isNotificationsMuted = isSenderMuted,
+                                showReason = selectedTab == InboxTab.SPAM,
+                                onOpenConversation = {
+                                    isNewMessageScreenOpen = false
+                                    openedConversationKey = conversation.senderKey
+                                },
+                                onMessageLongPress = { sms -> selectedForDelete = sms },
+                                onSwipeDeleteConversation = {
+                                    scope.launch {
+                                        conversation.messages.forEach { sms ->
+                                            repository.delete(sms)
+                                        }
+                                    }
+                                },
+                                onMuteNotifications = {
+                                    mutedSenderStore.mute(conversation.displaySender)
+                                    mutedSendersChangeToken++
+                                    Toast.makeText(
+                                        context,
+                                        "Bu gonderici icin bildirim kapatildi",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                },
+                                onUnmuteNotifications = {
+                                    mutedSenderStore.unmute(conversation.displaySender)
+                                    mutedSendersChangeToken++
+                                    Toast.makeText(
+                                        context,
+                                        "Bu gonderici icin bildirim yeniden acildi",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
 
-        if (openedConversation != null) {
-            ConversationDetailScreen(
-                conversation = openedConversation,
-                onBack = { openedConversationKey = null },
-                onMessageLongPress = { sms -> selectedForDelete = sms },
-                onSendMessage = { messageBody ->
-                    val sender = openedConversation.displaySender
-                    scope.launch {
-                        val sent = sendSmsMessage(
-                            context = context,
-                            destinationAddress = sender,
-                            messageBody = messageBody
-                        )
-                        if (sent) {
-                            repository.insert(
-                                SmsEntity(
-                                    sender = sender,
-                                    body = messageBody,
-                                    receivedAt = System.currentTimeMillis(),
-                                    status = SmsStatus.ALLOW,
-                                    reason = SENT_MESSAGE_REASON
-                                )
-                            )
-                        } else {
-                            Toast.makeText(
-                                context,
-                                "Mesaj gonderilemedi",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
-                }
-            )
-        } else if (visibleConversations.isEmpty()) {
-            Text(
-                text = emptyMessage,
-                modifier = Modifier.padding(top = 12.dp)
-            )
-        } else {
-            LazyColumn(
+        if (openedConversation == null && !isNewMessageScreenOpen) {
+            FloatingActionButton(
+                onClick = {
+                    selectedTab = InboxTab.MESSAGES
+                    openedConversationKey = null
+                    isNewMessageScreenOpen = true
+                },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .align(Alignment.BottomEnd)
+                    .padding(6.dp)
             ) {
-                items(visibleConversations, key = { it.senderKey }) { conversation ->
-                    val isSenderMuted = remember(conversation.senderKey, mutedSendersChangeToken) {
-                        mutedSenderStore.isMuted(conversation.displaySender)
-                    }
-                    ConversationListItem(
-                        conversation = conversation,
-                        isNotificationsMuted = isSenderMuted,
-                        showReason = selectedTab == InboxTab.SPAM,
-                        onOpenConversation = { openedConversationKey = conversation.senderKey },
-                        onMessageLongPress = { sms -> selectedForDelete = sms },
-                        onSwipeDeleteConversation = {
-                            scope.launch {
-                                conversation.messages.forEach { sms ->
-                                    repository.delete(sms)
-                                }
-                            }
-                        },
-                        onMuteNotifications = {
-                            mutedSenderStore.mute(conversation.displaySender)
-                            mutedSendersChangeToken++
-                            Toast.makeText(
-                                context,
-                                "Bu gonderici icin bildirim kapatildi",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        },
-                        onUnmuteNotifications = {
-                            mutedSenderStore.unmute(conversation.displaySender)
-                            mutedSendersChangeToken++
-                            Toast.makeText(
-                                context,
-                                "Bu gonderici icin bildirim yeniden acildi",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    )
-                }
+                Icon(
+                    painter = painterResource(id = android.R.drawable.ic_dialog_email),
+                    contentDescription = "Yeni mesaj"
+                )
             }
         }
     }
@@ -476,6 +543,7 @@ private fun ConversationDetailScreen(
     var draftMessage by remember(conversation.senderKey) { mutableStateOf("") }
     val listState = rememberLazyListState()
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val displayMessages = remember(conversation.messages) { conversation.messages.asReversed() }
 
     LaunchedEffect(displayMessages.size) {
@@ -500,6 +568,7 @@ private fun ConversationDetailScreen(
                 indication = null
             ) {
                 focusManager.clearFocus()
+                keyboardController?.hide()
             }
             .padding(top = 12.dp)
     ) {
@@ -507,8 +576,11 @@ private fun ConversationDetailScreen(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onBack) {
-                Text(text = "Geri")
+            IconButton(onClick = onBack) {
+                Icon(
+                    painter = painterResource(id = android.R.drawable.ic_media_previous),
+                    contentDescription = "Geri"
+                )
             }
             Text(
                 text = conversation.displaySender,
@@ -528,7 +600,10 @@ private fun ConversationDetailScreen(
             items(displayMessages, key = { it.id }) { sms ->
                 DetailMessageBubble(
                     sms = sms,
-                    onClick = { focusManager.clearFocus() },
+                    onClick = {
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                    },
                     onLongPress = { onMessageLongPress(sms) }
                 )
             }
@@ -550,6 +625,7 @@ private fun ConversationDetailScreen(
                             (keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter)
                         ) {
                             submitMessage()
+                            keyboardController?.hide()
                             true
                         } else {
                             false
@@ -557,13 +633,131 @@ private fun ConversationDetailScreen(
                     },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { submitMessage() }),
+                keyboardActions = KeyboardActions(
+                    onSend = {
+                        submitMessage()
+                        keyboardController?.hide()
+                    }
+                ),
                 placeholder = { Text(text = "Mesaj yaz") }
             )
             Spacer(modifier = Modifier.width(8.dp))
             Button(
-                onClick = { submitMessage() },
+                onClick = {
+                    submitMessage()
+                    keyboardController?.hide()
+                },
                 enabled = draftMessage.isNotBlank()
+            ) {
+                Text(text = "Gonder")
+            }
+        }
+    }
+}
+
+@Composable
+private fun NewMessageScreen(
+    onBack: () -> Unit,
+    onSendMessage: (destinationAddress: String, messageBody: String) -> Unit
+) {
+    var destinationAddress by remember { mutableStateOf("") }
+    var draftMessage by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    fun submitMessage() {
+        val recipient = destinationAddress.trim()
+        val messageBody = draftMessage.trim()
+
+        if (recipient.isBlank()) {
+            Toast.makeText(context, "Numara girin", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (messageBody.isBlank()) {
+            Toast.makeText(context, "Mesaj bos olamaz", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        onSendMessage(recipient, messageBody)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                focusManager.clearFocus()
+                keyboardController?.hide()
+            }
+            .padding(top = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = {
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
+                    onBack()
+                }
+            ) {
+                Icon(
+                    painter = painterResource(id = android.R.drawable.ic_media_previous),
+                    contentDescription = "Geri"
+                )
+            }
+            Text(text = "Yeni Mesaj")
+        }
+
+        OutlinedTextField(
+            value = destinationAddress,
+            onValueChange = { destinationAddress = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            singleLine = true,
+            label = { Text(text = "Numara") },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Phone,
+                imeAction = ImeAction.Next
+            )
+        )
+
+        OutlinedTextField(
+            value = draftMessage,
+            onValueChange = { draftMessage = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(top = 10.dp),
+            label = { Text(text = "Mesaj") },
+            placeholder = { Text(text = "Mesajinizi yazin") },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+            keyboardActions = KeyboardActions(
+                onSend = {
+                    submitMessage()
+                    keyboardController?.hide()
+                }
+            )
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Button(
+                onClick = {
+                    submitMessage()
+                    keyboardController?.hide()
+                },
+                enabled = destinationAddress.isNotBlank() && draftMessage.isNotBlank()
             ) {
                 Text(text = "Gonder")
             }
