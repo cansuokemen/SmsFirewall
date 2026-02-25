@@ -13,6 +13,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +31,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -57,14 +60,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
@@ -559,9 +565,16 @@ private fun ConversationDetailScreen(
         draftMessage = ""
     }
 
+    val handleBack = {
+        focusManager.clearFocus()
+        keyboardController?.hide()
+        onBack()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .swipeBackGesture(onBack = handleBack)
             .background(MaterialTheme.colorScheme.background)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -576,9 +589,9 @@ private fun ConversationDetailScreen(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
+            IconButton(onClick = handleBack) {
                 Icon(
-                    painter = painterResource(id = android.R.drawable.ic_media_previous),
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Geri"
                 )
             }
@@ -682,9 +695,16 @@ private fun NewMessageScreen(
         onSendMessage(recipient, messageBody)
     }
 
+    val handleBack = {
+        focusManager.clearFocus()
+        keyboardController?.hide()
+        onBack()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .swipeBackGesture(onBack = handleBack)
             .background(MaterialTheme.colorScheme.background)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -700,14 +720,10 @@ private fun NewMessageScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
-                onClick = {
-                    focusManager.clearFocus()
-                    keyboardController?.hide()
-                    onBack()
-                }
+                onClick = handleBack
             ) {
                 Icon(
-                    painter = painterResource(id = android.R.drawable.ic_media_previous),
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Geri"
                 )
             }
@@ -762,6 +778,40 @@ private fun NewMessageScreen(
                 Text(text = "Gonder")
             }
         }
+    }
+}
+
+private fun Modifier.swipeBackGesture(onBack: () -> Unit): Modifier = composed {
+    val swipeBackThresholdPx = with(LocalDensity.current) { SWIPE_BACK_THRESHOLD_DP.toPx() }
+    pointerInput(onBack, swipeBackThresholdPx) {
+        var draggedDistance = 0f
+        var backTriggered = false
+
+        detectHorizontalDragGestures(
+            onDragStart = {
+                draggedDistance = 0f
+                backTriggered = false
+            },
+            onHorizontalDrag = { change, dragAmount ->
+                if (dragAmount > 0f) {
+                    draggedDistance += dragAmount
+                }
+
+                if (!backTriggered && draggedDistance >= swipeBackThresholdPx) {
+                    backTriggered = true
+                    change.consume()
+                    onBack()
+                }
+            },
+            onDragEnd = {
+                draggedDistance = 0f
+                backTriggered = false
+            },
+            onDragCancel = {
+                draggedDistance = 0f
+                backTriggered = false
+            }
+        )
     }
 }
 
@@ -929,5 +979,6 @@ private fun ConversationListItemPreview() {
 
 private const val PHONE_COMPARE_LENGTH = 10
 private const val SENT_MESSAGE_REASON = "Sent by user"
+private val SWIPE_BACK_THRESHOLD_DP = 96.dp
 private val CONVERSATION_CARD_HEIGHT = 116.dp
 private val MESSAGE_BUBBLE_HEIGHT = 46.dp
