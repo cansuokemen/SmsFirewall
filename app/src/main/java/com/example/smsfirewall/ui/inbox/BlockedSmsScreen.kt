@@ -116,6 +116,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     var selectedTab by remember { mutableStateOf(InboxTab.MESSAGES) }
     var openedConversationKey by remember { mutableStateOf<String?>(null) }
     var isNewMessageScreenOpen by remember { mutableStateOf(false) }
+    var actionRevealedConversationKey by remember { mutableStateOf<String?>(null) }
     val shouldShowNotificationWarning = shouldShowNotificationPopupWarning(context)
 
     val openNotificationSettings: () -> Unit = {
@@ -147,6 +148,13 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     LaunchedEffect(openedConversationKey, openedConversation) {
         if (openedConversationKey != null && openedConversation == null) {
             openedConversationKey = null
+        }
+    }
+
+    LaunchedEffect(visibleConversations, actionRevealedConversationKey) {
+        val activeKey = actionRevealedConversationKey ?: return@LaunchedEffect
+        if (visibleConversations.none { it.senderKey == activeKey }) {
+            actionRevealedConversationKey = null
         }
     }
 
@@ -267,11 +275,22 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                                 showReason = selectedTab == InboxTab.SPAM,
                                 onOpenConversation = {
                                     isNewMessageScreenOpen = false
+                                    actionRevealedConversationKey = null
                                     openedConversationKey = conversation.senderKey
+                                },
+                                isActionsVisible = actionRevealedConversationKey == conversation.senderKey,
+                                onShowActions = {
+                                    actionRevealedConversationKey = conversation.senderKey
+                                },
+                                onHideActions = {
+                                    if (actionRevealedConversationKey == conversation.senderKey) {
+                                        actionRevealedConversationKey = null
+                                    }
                                 },
                                 onMessageLongPress = { sms -> selectedForDelete = sms },
                                 onSwipeDeleteConversation = {
                                     scope.launch {
+                                        actionRevealedConversationKey = null
                                         conversation.messages.forEach { sms ->
                                             repository.delete(sms)
                                         }
@@ -307,6 +326,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                 onClick = {
                     selectedTab = InboxTab.MESSAGES
                     openedConversationKey = null
+                    actionRevealedConversationKey = null
                     isNewMessageScreenOpen = true
                 },
                 modifier = Modifier
@@ -431,27 +451,29 @@ private fun ConversationListItem(
     isNotificationsMuted: Boolean,
     showReason: Boolean,
     onOpenConversation: () -> Unit,
+    isActionsVisible: Boolean,
+    onShowActions: () -> Unit,
+    onHideActions: () -> Unit,
     onMessageLongPress: (SmsEntity) -> Unit,
     onSwipeDeleteConversation: () -> Unit,
     onMuteNotifications: () -> Unit,
     onUnmuteNotifications: () -> Unit
 ) {
-    var actionsVisible by remember(conversation.senderKey) { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
                 SwipeToDismissBoxValue.EndToStart -> {
-                    if (actionsVisible) {
+                    if (isActionsVisible) {
                         onSwipeDeleteConversation()
                         true
                     } else {
-                        actionsVisible = true
+                        onShowActions()
                         false
                     }
                 }
 
                 SwipeToDismissBoxValue.StartToEnd -> {
-                    actionsVisible = false
+                    onHideActions()
                     false
                 }
 
@@ -500,7 +522,7 @@ private fun ConversationListItem(
                 }
             }
 
-            if (actionsVisible) {
+            if (isActionsVisible) {
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -512,7 +534,7 @@ private fun ConversationListItem(
                             iconRes = android.R.drawable.ic_lock_silent_mode_off,
                             contentDescription = "Bildirimi yeniden ac",
                             onClick = {
-                                actionsVisible = false
+                                onHideActions()
                                 onUnmuteNotifications()
                             }
                         )
@@ -521,7 +543,7 @@ private fun ConversationListItem(
                             iconRes = android.R.drawable.ic_lock_silent_mode,
                             contentDescription = "Bildirimleri kapat",
                             onClick = {
-                                actionsVisible = false
+                                onHideActions()
                                 onMuteNotifications()
                             }
                         )
@@ -530,7 +552,10 @@ private fun ConversationListItem(
                     SwipeActionButton(
                         iconRes = android.R.drawable.ic_menu_delete,
                         contentDescription = "Konusmayi sil",
-                        onClick = onSwipeDeleteConversation
+                        onClick = {
+                            onHideActions()
+                            onSwipeDeleteConversation()
+                        }
                     )
                 }
             }
@@ -969,6 +994,9 @@ private fun ConversationListItemPreview() {
             isNotificationsMuted = false,
             showReason = true,
             onOpenConversation = {},
+            isActionsVisible = false,
+            onShowActions = {},
+            onHideActions = {},
             onMessageLongPress = {},
             onSwipeDeleteConversation = {},
             onMuteNotifications = {},
