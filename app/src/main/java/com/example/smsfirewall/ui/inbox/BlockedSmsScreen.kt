@@ -2,12 +2,18 @@ package com.example.smsfirewall.ui.inbox
 
 import android.Manifest
 import android.app.NotificationManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.database.ContentObserver
+import android.os.Handler
 import android.os.Build
+import android.os.Looper
 import android.provider.Settings
+import android.provider.Telephony
 import android.telephony.SmsManager
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -50,11 +56,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -88,7 +96,9 @@ import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationConstants
 import com.example.smsfirewall.ui.theme.SmsFirewallTheme
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private enum class InboxTab(val title: String) {
     MESSAGES("Mesajlar"),
@@ -106,8 +116,7 @@ private data class SmsConversation(
 @Composable
 fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val allMessages by repository.getAll().collectAsState(initial = emptyList())
-    val regularMessages by repository.getByStatusNot(SmsStatus.BLOCK).collectAsState(initial = emptyList())
+    val regularMessages = rememberSystemMessages(context)
     val spamMessages by repository.getByStatus(SmsStatus.BLOCK).collectAsState(initial = emptyList())
     val mutedSenderStore = remember(context) { MutedSenderStore(context) }
     var mutedSendersChangeToken by remember { mutableIntStateOf(0) }
@@ -133,11 +142,14 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
         context.startActivity(intent)
     }
 
-    val visibleMessages = if (selectedTab == InboxTab.MESSAGES) regularMessages else spamMessages
+    val visibleMessages = if (selectedTab == InboxTab.MESSAGES) {
+        regularMessages
+    } else {
+        spamMessages
+    }
     val visibleConversations = remember(visibleMessages) { buildConversations(visibleMessages) }
-    val allConversations = remember(allMessages) { buildConversations(allMessages) }
-    val openedConversation = remember(openedConversationKey, allConversations) {
-        openedConversationKey?.let { key -> allConversations.firstOrNull { it.senderKey == key } }
+    val openedConversation = remember(openedConversationKey, visibleConversations) {
+        openedConversationKey?.let { key -> visibleConversations.firstOrNull { it.senderKey == key } }
     }
     val emptyMessage = if (selectedTab == InboxTab.MESSAGES) {
         "Mesaj bulunamadi"
@@ -168,14 +180,11 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
             return false
         }
 
-        repository.insert(
-            SmsEntity(
-                sender = destinationAddress,
-                body = messageBody,
-                receivedAt = System.currentTimeMillis(),
-                status = SmsStatus.ALLOW,
-                reason = SENT_MESSAGE_REASON
-            )
+        insertSentSmsIntoSystemProvider(
+            context = context,
+            destinationAddress = destinationAddress,
+            messageBody = messageBody,
+            sentAt = System.currentTimeMillis()
         )
         return true
     }
@@ -292,7 +301,11 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                                     scope.launch {
                                         actionRevealedConversationKey = null
                                         conversation.messages.forEach { sms ->
-                                            repository.delete(sms)
+                                            if (selectedTab == InboxTab.MESSAGES) {
+                                                deleteSmsFromSystemProvider(context, sms.id)
+                                            } else {
+                                                repository.delete(sms)
+                                            }
                                         }
                                     }
                                 },
@@ -351,7 +364,11 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                     onClick = {
                         val sms = selectedForDelete ?: return@TextButton
                         scope.launch {
-                            repository.delete(sms)
+                            if (selectedTab == InboxTab.MESSAGES) {
+                                deleteSmsFromSystemProvider(context, sms.id)
+                            } else {
+                                repository.delete(sms)
+                            }
                             selectedForDelete = null
                         }
                     }
@@ -400,6 +417,126 @@ private fun shouldShowNotificationPopupWarning(context: android.content.Context)
     }
 
     return false
+}
+
+@Composable
+private fun rememberSystemMessages(context: Context): List<SmsEntity> {
+    var refreshToken by remember { mutableIntStateOf(0) }
+
+    DisposableEffect(context) {
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                refreshToken++
+            }
+
+            override fun onChange(selfChange: Boolean, uri: android.net.Uri?) {
+                refreshToken++
+            }
+        }
+
+        context.contentResolver.registerContentObserver(
+            Telephony.Sms.CONTENT_URI,
+            true,
+            observer
+        )
+
+        onDispose {
+            context.contentResolver.unregisterContentObserver(observer)
+        }
+    }
+
+    val messages by produceState(initialValue = emptyList<SmsEntity>(), context, refreshToken) {
+        value = withContext(Dispatchers.IO) {
+            querySystemMessages(context)
+        }
+    }
+
+    return messages
+}
+
+private fun querySystemMessages(context: Context): List<SmsEntity> {
+    val projection = arrayOf("_id", "address", "body", "date", "type")
+    val selection = "type IN (?, ?)"
+    val selectionArgs = arrayOf(MESSAGE_TYPE_INBOX.toString(), MESSAGE_TYPE_SENT.toString())
+    val sortOrder = "date ASC"
+
+    return runCatching {
+        context.contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            projection,
+            selection,
+            selectionArgs,
+            sortOrder
+        )?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow("_id")
+            val addressColumn = cursor.getColumnIndexOrThrow("address")
+            val bodyColumn = cursor.getColumnIndexOrThrow("body")
+            val dateColumn = cursor.getColumnIndexOrThrow("date")
+            val typeColumn = cursor.getColumnIndexOrThrow("type")
+
+            buildList {
+                while (cursor.moveToNext()) {
+                    val smsType = cursor.getInt(typeColumn)
+                    add(
+                        SmsEntity(
+                            id = cursor.getLong(idColumn),
+                            sender = cursor.getString(addressColumn).orEmpty(),
+                            body = cursor.getString(bodyColumn).orEmpty(),
+                            receivedAt = cursor.getLong(dateColumn),
+                            status = SmsStatus.ALLOW,
+                            reason = if (smsType == MESSAGE_TYPE_SENT) {
+                                SENT_MESSAGE_REASON
+                            } else {
+                                SYSTEM_PROVIDER_REASON
+                            }
+                        )
+                    )
+                }
+            }
+        }.orEmpty()
+    }.onFailure { throwable ->
+        Log.e(TAG, "Failed to read SMS messages from provider", throwable)
+    }.getOrDefault(emptyList())
+}
+
+private suspend fun deleteSmsFromSystemProvider(context: Context, smsId: Long) {
+    if (smsId <= 0L) return
+
+    withContext(Dispatchers.IO) {
+        runCatching {
+            context.contentResolver.delete(
+                Telephony.Sms.CONTENT_URI,
+                "_id = ?",
+                arrayOf(smsId.toString())
+            )
+        }.onFailure { throwable ->
+            Log.e(TAG, "Failed to delete SMS from provider, id=$smsId", throwable)
+        }
+    }
+}
+
+private suspend fun insertSentSmsIntoSystemProvider(
+    context: Context,
+    destinationAddress: String,
+    messageBody: String,
+    sentAt: Long
+) {
+    withContext(Dispatchers.IO) {
+        val values = ContentValues().apply {
+            put("address", destinationAddress)
+            put("body", messageBody)
+            put("date", sentAt)
+            put("type", MESSAGE_TYPE_SENT)
+            put("read", 1)
+            put("seen", 1)
+        }
+
+        runCatching {
+            context.contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
+        }.onFailure { throwable ->
+            Log.e(TAG, "Failed to insert sent SMS into provider", throwable)
+        }
+    }
 }
 
 private fun buildConversations(messages: List<SmsEntity>): List<SmsConversation> {
@@ -1007,6 +1144,10 @@ private fun ConversationListItemPreview() {
 
 private const val PHONE_COMPARE_LENGTH = 10
 private const val SENT_MESSAGE_REASON = "Sent by user"
+private const val SYSTEM_PROVIDER_REASON = "From system provider"
+private const val MESSAGE_TYPE_INBOX = 1
+private const val MESSAGE_TYPE_SENT = 2
+private const val TAG = "BlockedSmsScreen"
 private val SWIPE_BACK_THRESHOLD_DP = 96.dp
 private val CONVERSATION_CARD_HEIGHT = 116.dp
 private val MESSAGE_BUBBLE_HEIGHT = 46.dp
