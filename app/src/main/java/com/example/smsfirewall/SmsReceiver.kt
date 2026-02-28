@@ -5,11 +5,13 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Telephony
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -18,8 +20,8 @@ import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.SmsFilterEngine
 import com.example.smsfirewall.filter.SmsStatus
-import com.example.smsfirewall.notifications.NotificationConstants
 import com.example.smsfirewall.notifications.MutedSenderStore
+import com.example.smsfirewall.notifications.NotificationConstants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -49,18 +51,26 @@ class SmsReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                val repository = SmsRepository(
-                    DatabaseProvider.getDatabase(context).smsDao()
-                )
-                repository.insert(
-                    SmsEntity(
+                if (decision.status == SmsStatus.BLOCK) {
+                    val repository = SmsRepository(DatabaseProvider.getDatabase(context).smsDao())
+                    repository.insert(
+                        SmsEntity(
+                            sender = sender,
+                            body = body,
+                            receivedAt = receivedAt,
+                            status = SmsStatus.BLOCK,
+                            reason = decision.reason
+                        )
+                    )
+                } else {
+                    insertIntoSystemInbox(
+                        context = context,
                         sender = sender,
                         body = body,
-                        receivedAt = receivedAt,
-                        status = decision.status.ifBlank { SmsStatus.REVIEW },
-                        reason = decision.reason
+                        receivedAt = receivedAt
                     )
-                )
+                }
+
                 val mutedSenderStore = MutedSenderStore(context)
                 if (decision.status != SmsStatus.BLOCK && !mutedSenderStore.isMuted(sender)) {
                     showAllowedSmsNotification(context, sender, body)
@@ -68,6 +78,27 @@ class SmsReceiver : BroadcastReceiver() {
             } finally {
                 pendingResult.finish()
             }
+        }
+    }
+
+    private fun insertIntoSystemInbox(
+        context: Context,
+        sender: String,
+        body: String,
+        receivedAt: Long
+    ) {
+        val values = ContentValues().apply {
+            put(Telephony.Sms.ADDRESS, sender)
+            put(Telephony.Sms.BODY, body)
+            put(Telephony.Sms.DATE, receivedAt)
+            put(Telephony.Sms.READ, 0)
+            put(Telephony.Sms.SEEN, 0)
+        }
+
+        runCatching {
+            context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values)
+        }.onFailure { throwable ->
+            Log.e(TAG, "Failed to insert allowed SMS into system provider", throwable)
         }
     }
 
@@ -112,5 +143,9 @@ class SmsReceiver : BroadcastReceiver() {
             .build()
 
         NotificationManagerCompat.from(context).notify(System.currentTimeMillis().toInt(), notification)
+    }
+
+    private companion object {
+        private const val TAG = "SmsReceiver"
     }
 }
