@@ -1089,8 +1089,10 @@ private fun sendSmsMessage(
         return false
     }
 
+    val smsManager = context.getSystemService(SmsManager::class.java) ?: return false
+
     return runCatching {
-        SmsManager.getDefault().sendTextMessage(
+        smsManager.sendTextMessage(
             destinationAddress,
             null,
             messageBody,
