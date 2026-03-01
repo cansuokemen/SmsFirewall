@@ -89,6 +89,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.example.smsfirewall.R
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.SmsStatus
@@ -347,7 +348,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                     .padding(6.dp)
             ) {
                 Icon(
-                    painter = painterResource(id = android.R.drawable.ic_dialog_email),
+                    painter = painterResource(id = R.drawable.ic_message_send),
                     contentDescription = "Yeni mesaj"
                 )
             }
