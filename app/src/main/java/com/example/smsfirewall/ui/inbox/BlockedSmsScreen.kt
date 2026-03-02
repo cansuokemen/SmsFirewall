@@ -72,6 +72,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -798,21 +799,26 @@ private fun ConversationListItem(
     onMuteNotifications: () -> Unit,
     onUnmuteNotifications: () -> Unit
 ) {
+    val currentIsActionsVisible by rememberUpdatedState(isActionsVisible)
+    val currentOnShowActions by rememberUpdatedState(onShowActions)
+    val currentOnHideActions by rememberUpdatedState(onHideActions)
+    val currentOnSwipeDeleteConversation by rememberUpdatedState(onSwipeDeleteConversation)
+
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
                 SwipeToDismissBoxValue.EndToStart -> {
-                    if (isActionsVisible) {
-                        onSwipeDeleteConversation()
+                    if (currentIsActionsVisible) {
+                        currentOnSwipeDeleteConversation()
                         true
                     } else {
-                        onShowActions()
+                        currentOnShowActions()
                         false
                     }
                 }
 
                 SwipeToDismissBoxValue.StartToEnd -> {
-                    onHideActions()
+                    currentOnHideActions()
                     false
                 }
 
