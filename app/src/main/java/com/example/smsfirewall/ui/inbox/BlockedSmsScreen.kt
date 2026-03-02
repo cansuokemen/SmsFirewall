@@ -379,85 +379,91 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
         }
 
         if (openedConversation == null && !isNewMessageScreenOpen) {
-            Row(
+            Box(
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
+                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background)
                     .imePadding()
-                    .padding(6.dp),
-                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    value = conversationSearchInput,
-                    onValueChange = { value ->
-                        conversationSearchInput = value
-                        conversationSearchQuery = value.trim()
-                    },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    shape = RoundedCornerShape(
-                        topStart = 28.dp,
-                        bottomStart = 28.dp,
-                        topEnd = 0.dp,
-                        bottomEnd = 0.dp
-                    ),
-                    placeholder = { Text(text = "Kelime veya numara ara") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        focusedBorderColor = MaterialTheme.colorScheme.primaryContainer,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.primaryContainer,
-                        cursorColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        focusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        focusedPlaceholderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                        unfocusedPlaceholderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                    ),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(
-                        onSearch = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 6.dp, end = 6.dp, top = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = conversationSearchInput,
+                        onValueChange = { value ->
+                            conversationSearchInput = value
+                            conversationSearchQuery = value.trim()
+                        },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        shape = RoundedCornerShape(
+                            topStart = 28.dp,
+                            bottomStart = 28.dp,
+                            topEnd = 0.dp,
+                            bottomEnd = 0.dp
+                        ),
+                        placeholder = { Text(text = "Kelime veya numara ara") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            focusedBorderColor = MaterialTheme.colorScheme.primaryContainer,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.primaryContainer,
+                            cursorColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            focusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            focusedPlaceholderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                            unfocusedPlaceholderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        ),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(
+                            onSearch = {
+                                applyConversationSearch()
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                            }
+                        )
+                    )
+                    FloatingActionButton(
+                        onClick = {
                             applyConversationSearch()
                             focusManager.clearFocus()
                             keyboardController?.hide()
-                        }
-                    )
-                )
-                FloatingActionButton(
-                    onClick = {
-                        applyConversationSearch()
-                        focusManager.clearFocus()
-                        keyboardController?.hide()
-                    },
-                    modifier = Modifier.size(56.dp),
-                    shape = RoundedCornerShape(
-                        topStart = 0.dp,
-                        bottomStart = 0.dp,
-                        topEnd = 16.dp,
-                        bottomEnd = 16.dp
-                    ),
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = "Mesaj ara"
-                    )
-                }
-                if (selectedTab == InboxTab.MESSAGES) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    FloatingActionButton(
-                        onClick = {
-                            selectedTab = InboxTab.MESSAGES
-                            openedConversationKey = null
-                            actionRevealedConversationKey = null
-                            isNewMessageScreenOpen = true
                         },
-                        modifier = Modifier.size(56.dp)
+                        modifier = Modifier.size(56.dp),
+                        shape = RoundedCornerShape(
+                            topStart = 0.dp,
+                            bottomStart = 0.dp,
+                            topEnd = 16.dp,
+                            bottomEnd = 16.dp
+                        ),
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_message_send),
-                            contentDescription = "Yeni mesaj"
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = "Mesaj ara"
                         )
+                    }
+                    if (selectedTab == InboxTab.MESSAGES) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        FloatingActionButton(
+                            onClick = {
+                                selectedTab = InboxTab.MESSAGES
+                                openedConversationKey = null
+                                actionRevealedConversationKey = null
+                                isNewMessageScreenOpen = true
+                            },
+                            modifier = Modifier.size(56.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_message_send),
+                                contentDescription = "Yeni mesaj"
+                            )
+                        }
                     }
                 }
             }
