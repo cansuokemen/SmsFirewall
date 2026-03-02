@@ -1093,6 +1093,7 @@ private fun NewMessageScreen(
                 keyboardController?.hide()
             }
             .padding(top = 12.dp)
+            .imePadding()
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
