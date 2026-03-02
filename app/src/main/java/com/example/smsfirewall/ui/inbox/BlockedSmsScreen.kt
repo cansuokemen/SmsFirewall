@@ -719,29 +719,67 @@ private fun normalizeSenderForGrouping(sender: String): String {
     }
 }
 
+private fun normalizeForSearch(value: String): String {
+    return value
+        .trim()
+        .lowercase(Locale.ROOT)
+        .filter { it.isLetterOrDigit() }
+}
+
+private fun normalizeDigits(value: String): String {
+    return value.filter { it.isDigit() }
+}
+
+private fun numberLikeMatch(candidate: String, queryDigits: String): Boolean {
+    if (queryDigits.isBlank()) return false
+
+    val candidateDigits = normalizeDigits(candidate)
+    if (candidateDigits.isBlank()) return false
+
+    if (candidateDigits.contains(queryDigits) || queryDigits.contains(candidateDigits)) {
+        return true
+    }
+
+    val candidateLastDigits = if (candidateDigits.length > PHONE_COMPARE_LENGTH) {
+        candidateDigits.takeLast(PHONE_COMPARE_LENGTH)
+    } else {
+        candidateDigits
+    }
+    val queryLastDigits = if (queryDigits.length > PHONE_COMPARE_LENGTH) {
+        queryDigits.takeLast(PHONE_COMPARE_LENGTH)
+    } else {
+        queryDigits
+    }
+
+    return candidateLastDigits.contains(queryLastDigits) || queryLastDigits.contains(candidateLastDigits)
+}
+
 private fun SmsConversation.matchesSearchQuery(query: String): Boolean {
     val trimmedQuery = query.trim()
     if (trimmedQuery.isBlank()) return true
 
-    val normalizedQuery = trimmedQuery
-        .lowercase(Locale.ROOT)
-        .filter { it.isLetterOrDigit() }
+    val normalizedQuery = normalizeForSearch(trimmedQuery)
+    val queryDigits = normalizeDigits(trimmedQuery)
 
     if (displaySender.contains(trimmedQuery, ignoreCase = true)) {
         return true
     }
 
-    if (normalizedQuery.isNotBlank() &&
-        normalizeSenderForGrouping(displaySender).contains(normalizedQuery)
-    ) {
+    if (normalizedQuery.isNotBlank() && normalizeForSearch(displaySender).contains(normalizedQuery)) {
+        return true
+    }
+
+    if (numberLikeMatch(displaySender, queryDigits)) {
         return true
     }
 
     return messages.any { sms ->
         sms.body.contains(trimmedQuery, ignoreCase = true) ||
+            (normalizedQuery.isNotBlank() && normalizeForSearch(sms.body).contains(normalizedQuery)) ||
             sms.sender.contains(trimmedQuery, ignoreCase = true) ||
-            (normalizedQuery.isNotBlank() &&
-                normalizeSenderForGrouping(sms.sender).contains(normalizedQuery))
+            (normalizedQuery.isNotBlank() && normalizeForSearch(sms.sender).contains(normalizedQuery)) ||
+            numberLikeMatch(sms.sender, queryDigits) ||
+            numberLikeMatch(sms.body, queryDigits)
     }
 }
 
