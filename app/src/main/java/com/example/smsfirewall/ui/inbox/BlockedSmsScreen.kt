@@ -224,6 +224,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
             if (openedConversation != null) {
                 ConversationDetailScreen(
                     conversation = openedConversation,
+                    canSendMessage = selectedTab == InboxTab.MESSAGES,
                     onBack = { openedConversationKey = null },
                     onMessageLongPress = { sms -> selectedForDelete = sms },
                     onSendMessage = { messageBody ->
@@ -429,20 +430,22 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                         contentDescription = "Mesaj ara"
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                FloatingActionButton(
-                    onClick = {
-                        selectedTab = InboxTab.MESSAGES
-                        openedConversationKey = null
-                        actionRevealedConversationKey = null
-                        isNewMessageScreenOpen = true
-                    },
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_message_send),
-                        contentDescription = "Yeni mesaj"
-                    )
+                if (selectedTab == InboxTab.MESSAGES) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    FloatingActionButton(
+                        onClick = {
+                            selectedTab = InboxTab.MESSAGES
+                            openedConversationKey = null
+                            actionRevealedConversationKey = null
+                            isNewMessageScreenOpen = true
+                        },
+                        modifier = Modifier.size(56.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_message_send),
+                            contentDescription = "Yeni mesaj"
+                        )
+                    }
                 }
             }
 
@@ -825,6 +828,7 @@ private fun ConversationListItem(
 @Composable
 private fun ConversationDetailScreen(
     conversation: SmsConversation,
+    canSendMessage: Boolean,
     onBack: () -> Unit,
     onMessageLongPress: (SmsEntity) -> Unit,
     onSendMessage: (String) -> Unit
@@ -850,6 +854,7 @@ private fun ConversationDetailScreen(
     }
 
     fun submitMessage() {
+        if (!canSendMessage) return
         val text = draftMessage.trim()
         if (text.isBlank()) return
         onSendMessage(text)
@@ -908,49 +913,51 @@ private fun ConversationDetailScreen(
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.background)
-                .imePadding()
-                .padding(top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = draftMessage,
-                onValueChange = { draftMessage = it },
+        if (canSendMessage) {
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .onPreviewKeyEvent { keyEvent ->
-                        if (keyEvent.type == KeyEventType.KeyUp &&
-                            (keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter)
-                        ) {
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background)
+                    .imePadding()
+                    .padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = draftMessage,
+                    onValueChange = { draftMessage = it },
+                    modifier = Modifier
+                        .weight(1f)
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyUp &&
+                                (keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter)
+                            ) {
+                                submitMessage()
+                                keyboardController?.hide()
+                                true
+                            } else {
+                                false
+                            }
+                        },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(
+                        onSend = {
                             submitMessage()
                             keyboardController?.hide()
-                            true
-                        } else {
-                            false
                         }
-                    },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(
-                    onSend = {
+                    ),
+                    placeholder = { Text(text = "Mesaj yaz") }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = {
                         submitMessage()
                         keyboardController?.hide()
-                    }
-                ),
-                placeholder = { Text(text = "Mesaj yaz") }
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(
-                onClick = {
-                    submitMessage()
-                    keyboardController?.hide()
-                },
-                enabled = draftMessage.isNotBlank()
-            ) {
-                Text(text = "Gonder")
+                    },
+                    enabled = draftMessage.isNotBlank()
+                ) {
+                    Text(text = "Gonder")
+                }
             }
         }
     }
