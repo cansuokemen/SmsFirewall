@@ -26,9 +26,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -734,7 +736,7 @@ private fun ConversationDetailScreen(
         onBack()
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .swipeBackGesture(onBack = handleBack)
@@ -748,46 +750,52 @@ private fun ConversationDetailScreen(
             }
             .padding(top = 12.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = handleBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Geri"
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = handleBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Geri"
+                    )
+                }
+                Text(
+                    text = conversation.displaySender,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            Text(
-                text = conversation.displaySender,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            state = listState,
-            reverseLayout = true,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            items(displayMessages, key = { it.id }) { sms ->
-                DetailMessageBubble(
-                    sms = sms,
-                    onClick = {
-                        focusManager.clearFocus()
-                        keyboardController?.hide()
-                    },
-                    onLongPress = { onMessageLongPress(sms) }
-                )
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 8.dp),
+                state = listState,
+                reverseLayout = true,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(bottom = 72.dp)
+            ) {
+                items(displayMessages, key = { it.id }) { sms ->
+                    DetailMessageBubble(
+                        sms = sms,
+                        onClick = {
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                        },
+                        onLongPress = { onMessageLongPress(sms) }
+                    )
+                }
             }
         }
 
         Row(
             modifier = Modifier
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.background)
+                .imePadding()
                 .padding(top = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
