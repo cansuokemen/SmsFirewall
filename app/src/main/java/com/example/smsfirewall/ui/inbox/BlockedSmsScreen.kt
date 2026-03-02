@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -715,11 +717,19 @@ private fun ConversationDetailScreen(
     val listState = rememberLazyListState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val density = LocalDensity.current
     val displayMessages = remember(conversation.messages) { conversation.messages.asReversed() }
+    val isKeyboardVisible = WindowInsets.ime.getBottom(density) > 0
 
     LaunchedEffect(displayMessages.size) {
         if (displayMessages.isNotEmpty()) {
             listState.scrollToItem(0)
+        }
+    }
+
+    LaunchedEffect(isKeyboardVisible) {
+        if (isKeyboardVisible && displayMessages.isNotEmpty()) {
+            listState.animateScrollToItem(0)
         }
     }
 
@@ -736,63 +746,54 @@ private fun ConversationDetailScreen(
         onBack()
     }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .swipeBackGesture(onBack = handleBack)
             .background(MaterialTheme.colorScheme.background)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                focusManager.clearFocus()
-                keyboardController?.hide()
-            }
             .padding(top = 12.dp)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = handleBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Geri"
-                    )
-                }
-                Text(
-                    text = conversation.displaySender,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = handleBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Geri"
                 )
             }
+            Text(
+                text = conversation.displaySender,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 8.dp),
-                state = listState,
-                reverseLayout = true,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                contentPadding = PaddingValues(bottom = 72.dp)
-            ) {
-                items(displayMessages, key = { it.id }) { sms ->
-                    DetailMessageBubble(
-                        sms = sms,
-                        onClick = {
-                            focusManager.clearFocus()
-                            keyboardController?.hide()
-                        },
-                        onLongPress = { onMessageLongPress(sms) }
-                    )
-                }
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(top = 8.dp),
+            state = listState,
+            reverseLayout = true,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(bottom = 8.dp)
+        ) {
+            items(displayMessages, key = { it.id }) { sms ->
+                DetailMessageBubble(
+                    sms = sms,
+                    onClick = {
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                    },
+                    onLongPress = { onMessageLongPress(sms) }
+                )
             }
         }
 
         Row(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.background)
                 .imePadding()
