@@ -39,10 +39,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -52,6 +54,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Tab
@@ -121,6 +124,8 @@ private data class SmsConversation(
 @Composable
 fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val regularMessages = rememberSystemMessages(context)
     val spamMessages by repository.getByStatus(SmsStatus.BLOCK).collectAsState(initial = emptyList())
     val mutedSenderStore = remember(context) { MutedSenderStore(context) }
@@ -131,6 +136,8 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     var openedConversationKey by remember { mutableStateOf<String?>(null) }
     var isNewMessageScreenOpen by remember { mutableStateOf(false) }
     var actionRevealedConversationKey by remember { mutableStateOf<String?>(null) }
+    var conversationSearchInput by remember { mutableStateOf("") }
+    var conversationSearchQuery by remember { mutableStateOf("") }
     val shouldShowNotificationWarning = shouldShowNotificationPopupWarning(context)
 
     val openNotificationSettings: () -> Unit = {
@@ -153,6 +160,16 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
         spamMessages
     }
     val visibleConversations = remember(visibleMessages) { buildConversations(visibleMessages) }
+    val filteredConversations = remember(visibleConversations, conversationSearchQuery) {
+        val query = conversationSearchQuery.trim()
+        if (query.isBlank()) {
+            visibleConversations
+        } else {
+            visibleConversations.filter { conversation ->
+                conversation.matchesSearchQuery(query)
+            }
+        }
+    }
     val openedConversation = remember(openedConversationKey, visibleConversations) {
         openedConversationKey?.let { key -> visibleConversations.firstOrNull { it.senderKey == key } }
     }
@@ -168,11 +185,15 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
         }
     }
 
-    LaunchedEffect(visibleConversations, actionRevealedConversationKey) {
+    LaunchedEffect(filteredConversations, actionRevealedConversationKey) {
         val activeKey = actionRevealedConversationKey ?: return@LaunchedEffect
-        if (visibleConversations.none { it.senderKey == activeKey }) {
+        if (filteredConversations.none { it.senderKey == activeKey }) {
             actionRevealedConversationKey = null
         }
+    }
+
+    fun applyConversationSearch() {
+        conversationSearchQuery = conversationSearchInput.trim()
     }
 
     suspend fun sendAndStoreMessage(destinationAddress: String, messageBody: String): Boolean {
@@ -267,19 +288,23 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                     }
                 }
 
-                if (visibleConversations.isEmpty()) {
+                if (filteredConversations.isEmpty()) {
                     Text(
-                        text = emptyMessage,
+                        text = if (conversationSearchQuery.isBlank()) {
+                            emptyMessage
+                        } else {
+                            "Arama sonucu bulunamadi"
+                        },
                         modifier = Modifier.padding(top = 12.dp)
                     )
                 } else {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(top = 12.dp, bottom = 84.dp),
+                            .padding(top = 12.dp, bottom = 92.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(visibleConversations, key = { it.senderKey }) { conversation ->
+                        items(filteredConversations, key = { it.senderKey }) { conversation ->
                             val isSenderMuted = remember(conversation.senderKey, mutedSendersChangeToken) {
                                 mutedSenderStore.isMuted(conversation.displaySender)
                             }
@@ -340,22 +365,87 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
         }
 
         if (openedConversation == null && !isNewMessageScreenOpen) {
-            FloatingActionButton(
-                onClick = {
-                    selectedTab = InboxTab.MESSAGES
-                    openedConversationKey = null
-                    actionRevealedConversationKey = null
-                    isNewMessageScreenOpen = true
-                },
+            Row(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(6.dp)
+                    .fillMaxWidth()
+                    .imePadding()
+                    .padding(6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_message_send),
-                    contentDescription = "Yeni mesaj"
+                OutlinedTextField(
+                    value = conversationSearchInput,
+                    onValueChange = { value ->
+                        conversationSearchInput = value
+                        conversationSearchQuery = value.trim()
+                    },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = RoundedCornerShape(
+                        topStart = 28.dp,
+                        bottomStart = 28.dp,
+                        topEnd = 0.dp,
+                        bottomEnd = 0.dp
+                    ),
+                    placeholder = { Text(text = "Kelime veya numara ara") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        focusedBorderColor = MaterialTheme.colorScheme.primaryContainer,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.primaryContainer,
+                        cursorColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        focusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        focusedPlaceholderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                        unfocusedPlaceholderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            applyConversationSearch()
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                        }
+                    )
                 )
+                FloatingActionButton(
+                    onClick = {
+                        applyConversationSearch()
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                    },
+                    modifier = Modifier.size(56.dp),
+                    shape = RoundedCornerShape(
+                        topStart = 0.dp,
+                        bottomStart = 0.dp,
+                        topEnd = 16.dp,
+                        bottomEnd = 16.dp
+                    ),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = "Mesaj ara"
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                FloatingActionButton(
+                    onClick = {
+                        selectedTab = InboxTab.MESSAGES
+                        openedConversationKey = null
+                        actionRevealedConversationKey = null
+                        isNewMessageScreenOpen = true
+                    },
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_message_send),
+                        contentDescription = "Yeni mesaj"
+                    )
+                }
             }
+
         }
     }
 
@@ -583,6 +673,32 @@ private fun normalizeSenderForGrouping(sender: String): String {
         }
     } else {
         alphanumeric
+    }
+}
+
+private fun SmsConversation.matchesSearchQuery(query: String): Boolean {
+    val trimmedQuery = query.trim()
+    if (trimmedQuery.isBlank()) return true
+
+    val normalizedQuery = trimmedQuery
+        .lowercase(Locale.ROOT)
+        .filter { it.isLetterOrDigit() }
+
+    if (displaySender.contains(trimmedQuery, ignoreCase = true)) {
+        return true
+    }
+
+    if (normalizedQuery.isNotBlank() &&
+        normalizeSenderForGrouping(displaySender).contains(normalizedQuery)
+    ) {
+        return true
+    }
+
+    return messages.any { sms ->
+        sms.body.contains(trimmedQuery, ignoreCase = true) ||
+            sms.sender.contains(trimmedQuery, ignoreCase = true) ||
+            (normalizedQuery.isNotBlank() &&
+                normalizeSenderForGrouping(sms.sender).contains(normalizedQuery))
     }
 }
 
