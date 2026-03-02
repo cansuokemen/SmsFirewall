@@ -88,6 +88,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -131,6 +132,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     val mutedSenderStore = remember(context) { MutedSenderStore(context) }
     var mutedSendersChangeToken by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
+    val conversationListState = rememberLazyListState()
     var selectedForDelete by remember { mutableStateOf<SmsEntity?>(null) }
     var selectedTab by remember { mutableStateOf(InboxTab.MESSAGES) }
     var openedConversationKey by remember { mutableStateOf<String?>(null) }
@@ -189,6 +191,12 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
         val activeKey = actionRevealedConversationKey ?: return@LaunchedEffect
         if (filteredConversations.none { it.senderKey == activeKey }) {
             actionRevealedConversationKey = null
+        }
+    }
+
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == InboxTab.SPAM) {
+            conversationListState.scrollToItem(0)
         }
     }
 
@@ -289,6 +297,10 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                     }
                 }
 
+                if (selectedTab == InboxTab.SPAM) {
+                    SpamAutoDeleteWarningCard()
+                }
+
                 if (filteredConversations.isEmpty()) {
                     Text(
                         text = if (conversationSearchQuery.isBlank()) {
@@ -303,6 +315,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(top = 12.dp, bottom = 92.dp),
+                        state = conversationListState,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(filteredConversations, key = { it.senderKey }) { conversation ->
@@ -497,6 +510,27 @@ private fun NotificationWarningCard(onOpenSettings: () -> Unit) {
                 Text(text = "Open Settings")
             }
         }
+    }
+}
+
+@Composable
+private fun SpamAutoDeleteWarningCard() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFFFFF4CC))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            painter = painterResource(id = android.R.drawable.ic_dialog_alert),
+            contentDescription = "Uyarı",
+            tint = Color(0xFFF2B300)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = "Spam mesajlar 30 gün sonra otomatik olarak silinecektir.")
     }
 }
 
