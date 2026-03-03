@@ -542,7 +542,7 @@ private fun SpamAutoDeleteWarningCard() {
             tint = Color(0xFFF2B300)
         )
         Spacer(modifier = Modifier.width(8.dp))
-        Text(text = "Spam mesajlar 1 gün sonra otomatik olarak silinecektir.")
+        Text(text = "Spam mesajlar 30 gün sonra otomatik olarak silinecektir.")
     }
 }
 
