@@ -16,6 +16,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.smsfirewall.data.DatabaseProvider
+import com.example.smsfirewall.data.SpamRetentionPolicy
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.SmsFilterEngine
@@ -51,8 +52,8 @@ class SmsReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
+                val repository = SmsRepository(DatabaseProvider.getDatabase(context).smsDao())
                 if (decision.status == SmsStatus.BLOCK) {
-                    val repository = SmsRepository(DatabaseProvider.getDatabase(context).smsDao())
                     repository.insert(
                         SmsEntity(
                             sender = sender,
@@ -70,6 +71,11 @@ class SmsReceiver : BroadcastReceiver() {
                         receivedAt = receivedAt
                     )
                 }
+
+                repository.deleteByStatusBefore(
+                    status = SmsStatus.BLOCK,
+                    beforeTimestamp = SpamRetentionPolicy.cutoffTimestamp()
+                )
 
                 val mutedSenderStore = MutedSenderStore(context)
                 if (decision.status != SmsStatus.BLOCK && !mutedSenderStore.isMuted(sender)) {

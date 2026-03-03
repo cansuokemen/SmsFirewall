@@ -23,6 +23,10 @@ class SmsRepository(
         return smsDao.getByStatusNot(status)
     }
 
+    suspend fun deleteByStatusBefore(status: String, beforeTimestamp: Long): Int {
+        return smsDao.deleteByStatusBefore(status, beforeTimestamp)
+    }
+
     suspend fun delete(sms: SmsEntity) {
         smsDao.delete(sms)
     }

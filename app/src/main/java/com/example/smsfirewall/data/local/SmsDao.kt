@@ -21,6 +21,9 @@ interface SmsDao {
     @Query("SELECT * FROM sms_messages WHERE status != :status ORDER BY receivedAt DESC")
     fun getByStatusNot(status: String): Flow<List<SmsEntity>>
 
+    @Query("DELETE FROM sms_messages WHERE status = :status AND receivedAt < :beforeTimestamp")
+    suspend fun deleteByStatusBefore(status: String, beforeTimestamp: Long): Int
+
     @Delete
     suspend fun delete(sms: SmsEntity)
 }

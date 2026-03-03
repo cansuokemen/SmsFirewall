@@ -99,6 +99,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.smsfirewall.R
+import com.example.smsfirewall.data.SpamRetentionPolicy
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.SmsStatus
@@ -198,6 +199,10 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     LaunchedEffect(selectedTab) {
         if (selectedTab == InboxTab.SPAM) {
             conversationListState.scrollToItem(0)
+            repository.deleteByStatusBefore(
+                status = SmsStatus.BLOCK,
+                beforeTimestamp = SpamRetentionPolicy.cutoffTimestamp()
+            )
         }
     }
 
@@ -537,7 +542,7 @@ private fun SpamAutoDeleteWarningCard() {
             tint = Color(0xFFF2B300)
         )
         Spacer(modifier = Modifier.width(8.dp))
-        Text(text = "Spam mesajlar 30 gün sonra otomatik olarak silinecektir.")
+        Text(text = "Spam mesajlar 1 gün sonra otomatik olarak silinecektir.")
     }
 }
 
