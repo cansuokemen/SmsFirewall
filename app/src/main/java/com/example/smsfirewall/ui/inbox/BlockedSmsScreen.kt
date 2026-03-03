@@ -1,20 +1,25 @@
 package com.example.smsfirewall.ui.inbox
 
 import android.Manifest
+import android.app.Activity
 import android.app.NotificationManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.ContentObserver
+import android.net.Uri
 import android.os.Handler
 import android.os.Build
 import android.os.Looper
+import android.provider.ContactsContract
 import android.provider.Settings
 import android.provider.Telephony
 import android.telephony.SmsManager
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -39,11 +44,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -1182,6 +1189,32 @@ private fun NewMessageScreen(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val scope = rememberCoroutineScope()
+    val contactPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode != Activity.RESULT_OK) {
+            return@rememberLauncherForActivityResult
+        }
+
+        val contactUri = result.data?.data
+        if (contactUri == null) {
+            Toast.makeText(context, "Kisi secilemedi", Toast.LENGTH_SHORT).show()
+            return@rememberLauncherForActivityResult
+        }
+
+        scope.launch {
+            val selectedNumber = readPhoneNumberFromPickerUri(
+                context = context,
+                contactUri = contactUri
+            )
+            if (selectedNumber.isNullOrBlank()) {
+                Toast.makeText(context, "Numara bulunamadi", Toast.LENGTH_SHORT).show()
+            } else {
+                destinationAddress = selectedNumber
+            }
+        }
+    }
 
     fun submitMessage() {
         val recipient = destinationAddress.trim()
@@ -1235,19 +1268,51 @@ private fun NewMessageScreen(
             Text(text = "Yeni Mesaj")
         }
 
-        OutlinedTextField(
-            value = destinationAddress,
-            onValueChange = { destinationAddress = it },
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp),
-            singleLine = true,
-            label = { Text(text = "Numara") },
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Phone,
-                imeAction = ImeAction.Next
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = {
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
+                    val pickContactIntent = Intent(
+                        Intent.ACTION_PICK,
+                        ContactsContract.CommonDataKinds.Phone.CONTENT_URI
+                    )
+                    runCatching {
+                        contactPickerLauncher.launch(pickContactIntent)
+                    }.onFailure { throwable ->
+                        Log.e(TAG, "Failed to open contact picker", throwable)
+                        Toast.makeText(context, "Rehber acilamadi", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = "Rehberden sec",
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            OutlinedTextField(
+                value = destinationAddress,
+                onValueChange = { destinationAddress = it },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                label = { Text(text = "Numara") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Phone,
+                    imeAction = ImeAction.Next
+                )
             )
-        )
+        }
 
         OutlinedTextField(
             value = draftMessage,
@@ -1443,6 +1508,32 @@ private fun sendSmsMessage(
             null
         )
     }.isSuccess
+}
+
+private suspend fun readPhoneNumberFromPickerUri(
+    context: Context,
+    contactUri: Uri
+): String? {
+    return withContext(Dispatchers.IO) {
+        runCatching {
+            context.contentResolver.query(
+                contactUri,
+                arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                val numberIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+                if (numberIndex == -1 || !cursor.moveToFirst()) {
+                    null
+                } else {
+                    cursor.getString(numberIndex)?.trim()
+                }
+            }
+        }.onFailure { throwable ->
+            Log.e(TAG, "Failed to read selected contact", throwable)
+        }.getOrNull()
+    }
 }
 
 @Preview(showBackground = true)
