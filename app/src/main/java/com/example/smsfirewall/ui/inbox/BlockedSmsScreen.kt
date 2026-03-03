@@ -47,6 +47,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -136,6 +137,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     val conversationListState = rememberLazyListState()
     var selectedForDelete by remember { mutableStateOf<SmsEntity?>(null) }
+    var openedSpamMessage by remember { mutableStateOf<SmsEntity?>(null) }
     var selectedTab by remember { mutableStateOf(InboxTab.MESSAGES) }
     var openedConversationKey by remember { mutableStateOf<String?>(null) }
     var isNewMessageScreenOpen by remember { mutableStateOf(false) }
@@ -239,8 +241,37 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                 ConversationDetailScreen(
                     conversation = openedConversation,
                     canSendMessage = selectedTab == InboxTab.MESSAGES,
+                    isSpamConversation = selectedTab == InboxTab.SPAM,
                     onBack = { openedConversationKey = null },
                     onMessageLongPress = { sms -> selectedForDelete = sms },
+                    onSpamMessageClick = { sms -> openedSpamMessage = sms },
+                    onMarkAsNotSpam = { sms ->
+                        scope.launch {
+                            val moved = moveSpamToSystemInbox(
+                                context = context,
+                                repository = repository,
+                                sms = sms
+                            )
+                            if (moved) {
+                                Toast.makeText(
+                                    context,
+                                    "Mesaj normal kutuya tasindi",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "Mesaj tasinamadi",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    },
+                    onDeleteSpam = { sms ->
+                        scope.launch {
+                            repository.delete(sms)
+                        }
+                    },
                     onSendMessage = { messageBody ->
                         val sender = openedConversation.displaySender
                         scope.launch {
@@ -506,6 +537,19 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
             }
         )
     }
+
+    if (openedSpamMessage != null) {
+        AlertDialog(
+            onDismissRequest = { openedSpamMessage = null },
+            title = { Text(text = "Spam mesaj") },
+            text = { Text(text = openedSpamMessage?.body.orEmpty().ifBlank { "(Bos mesaj)" }) },
+            confirmButton = {
+                TextButton(onClick = { openedSpamMessage = null }) {
+                    Text(text = "Kapat")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -681,6 +725,35 @@ private suspend fun insertSentSmsIntoSystemProvider(
             Log.e(TAG, "Failed to insert sent SMS into provider", throwable)
         }
     }
+}
+
+private suspend fun moveSpamToSystemInbox(
+    context: Context,
+    repository: SmsRepository,
+    sms: SmsEntity
+): Boolean {
+    val insertedIntoInbox = withContext(Dispatchers.IO) {
+        val values = ContentValues().apply {
+            put(Telephony.Sms.ADDRESS, sms.sender)
+            put(Telephony.Sms.BODY, sms.body)
+            put(Telephony.Sms.DATE, sms.receivedAt)
+            put(Telephony.Sms.READ, 0)
+            put(Telephony.Sms.SEEN, 0)
+        }
+
+        runCatching {
+            context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values) != null
+        }.onFailure { throwable ->
+            Log.e(TAG, "Failed to move spam SMS into inbox", throwable)
+        }.getOrDefault(false)
+    }
+
+    if (!insertedIntoInbox) {
+        return false
+    }
+
+    repository.delete(sms)
+    return true
 }
 
 private fun buildConversations(messages: List<SmsEntity>): List<SmsConversation> {
@@ -918,8 +991,12 @@ private fun ConversationListItem(
 private fun ConversationDetailScreen(
     conversation: SmsConversation,
     canSendMessage: Boolean,
+    isSpamConversation: Boolean,
     onBack: () -> Unit,
     onMessageLongPress: (SmsEntity) -> Unit,
+    onSpamMessageClick: (SmsEntity) -> Unit,
+    onMarkAsNotSpam: (SmsEntity) -> Unit,
+    onDeleteSpam: (SmsEntity) -> Unit,
     onSendMessage: (String) -> Unit
 ) {
     var draftMessage by remember(conversation.senderKey) { mutableStateOf("") }
@@ -996,9 +1073,18 @@ private fun ConversationDetailScreen(
                     onClick = {
                         focusManager.clearFocus()
                         keyboardController?.hide()
+                        if (isSpamConversation) {
+                            onSpamMessageClick(sms)
+                        }
                     },
                     onLongPress = { onMessageLongPress(sms) }
                 )
+                if (isSpamConversation) {
+                    SpamMessageActionRow(
+                        onMarkAsNotSpam = { onMarkAsNotSpam(sms) },
+                        onDelete = { onDeleteSpam(sms) }
+                    )
+                }
             }
         }
 
@@ -1048,6 +1134,40 @@ private fun ConversationDetailScreen(
                     Text(text = "Gonder")
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SpamMessageActionRow(
+    onMarkAsNotSpam: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Button(
+            onClick = onMarkAsNotSpam,
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        ) {
+            Text(text = "Spam değil")
+        }
+        Button(
+            onClick = onDelete,
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        ) {
+            Text(text = "Sil")
         }
     }
 }
