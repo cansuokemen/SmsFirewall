@@ -44,7 +44,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -1274,7 +1273,35 @@ private fun NewMessageScreen(
                 .padding(top = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
+            OutlinedTextField(
+                value = destinationAddress,
+                onValueChange = { destinationAddress = it },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                shape = RoundedCornerShape(
+                    topStart = 28.dp,
+                    bottomStart = 28.dp,
+                    topEnd = 0.dp,
+                    bottomEnd = 0.dp
+                ),
+                label = { Text(text = "Numara") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    focusedBorderColor = MaterialTheme.colorScheme.primaryContainer,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.primaryContainer,
+                    cursorColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    focusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    focusedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                ),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Phone,
+                    imeAction = ImeAction.Next
+                )
+            )
+            FloatingActionButton(
                 onClick = {
                     focusManager.clearFocus()
                     keyboardController?.hide()
@@ -1290,28 +1317,22 @@ private fun NewMessageScreen(
                     }
                 },
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
+                    .size(56.dp),
+                shape = RoundedCornerShape(
+                    topStart = 0.dp,
+                    bottomStart = 0.dp,
+                    topEnd = 16.dp,
+                    bottomEnd = 16.dp
+                ),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
                     contentDescription = "Rehberden sec",
-                    tint = MaterialTheme.colorScheme.onPrimary
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            OutlinedTextField(
-                value = destinationAddress,
-                onValueChange = { destinationAddress = it },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                label = { Text(text = "Numara") },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Phone,
-                    imeAction = ImeAction.Next
-                )
-            )
         }
 
         OutlinedTextField(
