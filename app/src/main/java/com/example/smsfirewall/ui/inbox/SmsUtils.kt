@@ -48,11 +48,17 @@ internal data class SmsConversation(
     val senderKey: String,
     val displaySender: String,
     val messages: List<SmsEntity>,
-    val latestReceivedAt: Long
+    val latestReceivedAt: Long,
+    val unreadCount: Int = 0
+)
+
+internal data class SystemMessagesResult(
+    val messages: List<SmsEntity>,
+    val unreadIds: Set<Long>
 )
 
 @Composable
-internal fun rememberSystemMessages(context: Context): List<SmsEntity> {
+internal fun rememberSystemMessages(context: Context): SystemMessagesResult {
     var refreshToken by remember { mutableIntStateOf(0) }
 
     DisposableEffect(context) {
@@ -77,17 +83,25 @@ internal fun rememberSystemMessages(context: Context): List<SmsEntity> {
         }
     }
 
-    val messages by produceState(initialValue = emptyList<SmsEntity>(), context, refreshToken) {
+    val result by produceState(
+        initialValue = SystemMessagesResult(emptyList(), emptySet()),
+        context,
+        refreshToken
+    ) {
         value = withContext(Dispatchers.IO) {
-            querySystemMessages(context)
+            querySystemMessagesWithReadStatus(context)
         }
     }
 
-    return messages
+    return result
 }
 
 internal fun querySystemMessages(context: Context): List<SmsEntity> {
-    val projection = arrayOf("_id", "address", "body", "date", "type")
+    return querySystemMessagesWithReadStatus(context).messages
+}
+
+private fun querySystemMessagesWithReadStatus(context: Context): SystemMessagesResult {
+    val projection = arrayOf("_id", "address", "body", "date", "type", "read")
     val selection = "type IN (?, ?)"
     val selectionArgs = arrayOf(MESSAGE_TYPE_INBOX.toString(), MESSAGE_TYPE_SENT.toString())
     val sortOrder = "date ASC"
@@ -105,30 +119,41 @@ internal fun querySystemMessages(context: Context): List<SmsEntity> {
             val bodyColumn = cursor.getColumnIndexOrThrow("body")
             val dateColumn = cursor.getColumnIndexOrThrow("date")
             val typeColumn = cursor.getColumnIndexOrThrow("type")
+            val readColumn = cursor.getColumnIndexOrThrow("read")
 
-            buildList {
-                while (cursor.moveToNext()) {
-                    val smsType = cursor.getInt(typeColumn)
-                    add(
-                        SmsEntity(
-                            id = cursor.getLong(idColumn),
-                            sender = cursor.getString(addressColumn).orEmpty(),
-                            body = cursor.getString(bodyColumn).orEmpty(),
-                            receivedAt = cursor.getLong(dateColumn),
-                            status = SmsStatus.ALLOW,
-                            reason = if (smsType == MESSAGE_TYPE_SENT) {
-                                SENT_MESSAGE_REASON
-                            } else {
-                                SYSTEM_PROVIDER_REASON
-                            }
-                        )
+            val messages = mutableListOf<SmsEntity>()
+            val unreadIds = mutableSetOf<Long>()
+
+            while (cursor.moveToNext()) {
+                val smsType = cursor.getInt(typeColumn)
+                val smsId = cursor.getLong(idColumn)
+                val isRead = cursor.getInt(readColumn) == 1
+
+                messages.add(
+                    SmsEntity(
+                        id = smsId,
+                        sender = cursor.getString(addressColumn).orEmpty(),
+                        body = cursor.getString(bodyColumn).orEmpty(),
+                        receivedAt = cursor.getLong(dateColumn),
+                        status = SmsStatus.ALLOW,
+                        reason = if (smsType == MESSAGE_TYPE_SENT) {
+                            SENT_MESSAGE_REASON
+                        } else {
+                            SYSTEM_PROVIDER_REASON
+                        }
                     )
+                )
+
+                if (!isRead && smsType == MESSAGE_TYPE_INBOX) {
+                    unreadIds.add(smsId)
                 }
             }
-        }.orEmpty()
+
+            SystemMessagesResult(messages, unreadIds)
+        } ?: SystemMessagesResult(emptyList(), emptySet())
     }.onFailure { throwable ->
         Log.e(TAG, "Failed to read SMS messages from provider", throwable)
-    }.getOrDefault(emptyList())
+    }.getOrDefault(SystemMessagesResult(emptyList(), emptySet()))
 }
 
 internal suspend fun deleteSmsFromSystemProvider(context: Context, smsId: Long) {
@@ -256,7 +281,10 @@ internal suspend fun readPhoneNumberFromPickerUri(
     }
 }
 
-internal fun buildConversations(messages: List<SmsEntity>): List<SmsConversation> {
+internal fun buildConversations(
+    messages: List<SmsEntity>,
+    unreadIds: Set<Long> = emptySet()
+): List<SmsConversation> {
     return messages
         .groupBy { normalizeSenderForGrouping(it.sender) }
         .mapNotNull { (senderKey, senderMessages) ->
@@ -266,12 +294,16 @@ internal fun buildConversations(messages: List<SmsEntity>): List<SmsConversation
 
             val sortedMessages = senderMessages.sortedBy { it.receivedAt }
             val latestMessage = sortedMessages.last()
+            val unread = if (unreadIds.isEmpty()) 0 else {
+                senderMessages.count { it.id in unreadIds }
+            }
 
             SmsConversation(
                 senderKey = senderKey.ifBlank { "unknown_sender_${latestMessage.id}" },
                 displaySender = latestMessage.sender.ifBlank { "Bilinmeyen gonderici" },
                 messages = sortedMessages,
-                latestReceivedAt = latestMessage.receivedAt
+                latestReceivedAt = latestMessage.receivedAt,
+                unreadCount = unread
             )
         }
         .sortedByDescending { it.latestReceivedAt }
@@ -359,6 +391,39 @@ internal fun SmsConversation.matchesSearchQuery(query: String): Boolean {
             (normalizedQuery.isNotBlank() && normalizeForSearch(sms.sender).contains(normalizedQuery)) ||
             numberLikeMatch(sms.sender, queryDigits) ||
             numberLikeMatch(sms.body, queryDigits)
+    }
+}
+
+// Mark conversation messages as read in system provider
+internal suspend fun markConversationAsRead(
+    context: Context,
+    conversation: SmsConversation,
+    unreadIds: Set<Long>
+) {
+    val idsToMark = conversation.messages
+        .map { it.id }
+        .filter { it in unreadIds }
+
+    if (idsToMark.isEmpty()) return
+
+    withContext(Dispatchers.IO) {
+        val values = ContentValues().apply {
+            put("read", 1)
+            put("seen", 1)
+        }
+
+        idsToMark.forEach { smsId ->
+            runCatching {
+                context.contentResolver.update(
+                    Telephony.Sms.CONTENT_URI,
+                    values,
+                    "_id = ?",
+                    arrayOf(smsId.toString())
+                )
+            }.onFailure { throwable ->
+                Log.e(TAG, "Failed to mark SMS as read, id=$smsId", throwable)
+            }
+        }
     }
 }
 

@@ -106,7 +106,9 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val regularMessages = rememberSystemMessages(context)
+    val systemResult = rememberSystemMessages(context)
+    val regularMessages = systemResult.messages
+    val unreadIds = systemResult.unreadIds
     val spamMessages by repository.getByStatus(SmsStatus.BLOCK).collectAsState(initial = emptyList())
     val mutedSenderStore = remember(context) { MutedSenderStore(context) }
     var mutedSendersChangeToken by remember { mutableIntStateOf(0) }
@@ -149,7 +151,10 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     } else {
         spamMessages
     }
-    val visibleConversations = remember(visibleMessages) { buildConversations(visibleMessages) }
+    val currentUnreadIds = if (selectedTab == InboxTab.MESSAGES) unreadIds else emptySet()
+    val visibleConversations = remember(visibleMessages, currentUnreadIds) {
+        buildConversations(visibleMessages, currentUnreadIds)
+    }
     val filteredConversations = remember(visibleConversations, conversationSearchQuery) {
         val query = conversationSearchQuery.trim()
         if (query.isBlank()) {
@@ -349,6 +354,13 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                                                 isNewMessageScreenOpen = false
                                                 actionRevealedConversationKey = null
                                                 openedConversationKey = conversation.senderKey
+                                                if (conversation.unreadCount > 0) {
+                                                    scope.launch {
+                                                        markConversationAsRead(
+                                                            context, conversation, unreadIds
+                                                        )
+                                                    }
+                                                }
                                             },
                                             isActionsVisible = actionRevealedConversationKey == conversation.senderKey,
                                             onShowActions = {
@@ -561,6 +573,7 @@ private fun ConversationListItem(
     val displayName = contactName ?: conversation.displaySender
     val avatarLetter = displayName.firstOrNull()?.uppercase() ?: "?"
     val avatarColor = avatarColorForSender(conversation.displaySender)
+    val hasUnread = conversation.unreadCount > 0
 
     SwipeToDismissBox(
         state = dismissState,
@@ -626,16 +639,47 @@ private fun ConversationListItem(
                             Text(
                                 text = displayName,
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.SemiBold,
+                                color = if (hasUnread) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
                             )
-                            Text(
-                                text = formatConversationTimestamp(conversation.latestReceivedAt),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = formatConversationTimestamp(conversation.latestReceivedAt),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (hasUnread) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.Normal
+                                )
+                                if (hasUnread) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = if (conversation.unreadCount > 99) "99+" else conversation.unreadCount.toString(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
                         }
 
                         val latestMessage = conversation.messages.lastOrNull()
@@ -643,7 +687,12 @@ private fun ConversationListItem(
                             Text(
                                 text = latestMessage.body.ifBlank { "(Bos mesaj)" },
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (hasUnread) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                fontWeight = if (hasUnread) FontWeight.Medium else FontWeight.Normal,
                                 maxLines = if (showReason) 1 else 2,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(top = 2.dp)
