@@ -77,7 +77,7 @@ internal fun NewMessageScreen(
 
         val contactUri = result.data?.data
         if (contactUri == null) {
-            Toast.makeText(context, "Kisi secilemedi", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Kişi seçilemedi", Toast.LENGTH_SHORT).show()
             return@rememberLauncherForActivityResult
         }
 
@@ -87,7 +87,7 @@ internal fun NewMessageScreen(
                 contactUri = contactUri
             )
             if (selectedNumber.isNullOrBlank()) {
-                Toast.makeText(context, "Numara bulunamadi", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Numara bulunamadı", Toast.LENGTH_SHORT).show()
             } else {
                 destinationAddress = selectedNumber
             }
@@ -103,7 +103,7 @@ internal fun NewMessageScreen(
             return
         }
         if (messageBody.isBlank()) {
-            Toast.makeText(context, "Mesaj bos olamaz", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Mesaj boş olamaz", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -185,7 +185,7 @@ internal fun NewMessageScreen(
                         contactPickerLauncher.launch(pickContactIntent)
                     }.onFailure { throwable ->
                         Log.e(TAG, "Failed to open contact picker", throwable)
-                        Toast.makeText(context, "Rehber acilamadi", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Rehber açılamadı", Toast.LENGTH_SHORT).show()
                     }
                 },
                 modifier = Modifier.size(56.dp),
@@ -195,7 +195,7 @@ internal fun NewMessageScreen(
             ) {
                 Icon(
                     imageVector = Icons.Outlined.PersonAdd,
-                    contentDescription = "Rehberden sec"
+                    contentDescription = "Rehberden seç"
                 )
             }
         }
@@ -209,7 +209,7 @@ internal fun NewMessageScreen(
                 .padding(horizontal = 12.dp, vertical = 12.dp),
             shape = RoundedCornerShape(16.dp),
             label = { Text(text = "Mesaj") },
-            placeholder = { Text(text = "Mesajinizi yazin") },
+            placeholder = { Text(text = "Mesajınızı yazın") },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outline
@@ -244,7 +244,7 @@ internal fun NewMessageScreen(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Gonder"
+                    contentDescription = "Gönder"
                 )
             }
         }

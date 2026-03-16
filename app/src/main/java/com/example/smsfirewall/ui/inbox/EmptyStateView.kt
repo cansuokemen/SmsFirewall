@@ -56,8 +56,8 @@ internal fun EmptyStateView(
 internal fun MessagesEmptyState(modifier: Modifier = Modifier) {
     EmptyStateView(
         icon = Icons.Outlined.MailOutline,
-        title = "Henuz mesaj yok",
-        subtitle = "Gelen mesajlariniz burada gorunecek",
+        title = "Henüz mesaj yok",
+        subtitle = "Gelen mesajlarınız burada görünecek",
         modifier = modifier
     )
 }
@@ -67,7 +67,7 @@ internal fun SpamEmptyState(modifier: Modifier = Modifier) {
     EmptyStateView(
         icon = Icons.Outlined.Shield,
         title = "Spam mesaj yok",
-        subtitle = "Engellenen mesajlar burada gorunecek",
+        subtitle = "Engellenen mesajlar burada görünecek",
         modifier = modifier
     )
 }
@@ -76,8 +76,8 @@ internal fun SpamEmptyState(modifier: Modifier = Modifier) {
 internal fun SearchEmptyState(modifier: Modifier = Modifier) {
     EmptyStateView(
         icon = Icons.Outlined.Search,
-        title = "Sonuc bulunamadi",
-        subtitle = "Farkli bir arama terimi deneyin",
+        title = "Sonuç bulunamadı",
+        subtitle = "Farklı bir arama terimi deneyin",
         modifier = modifier
     )
 }

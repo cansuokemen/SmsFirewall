@@ -58,7 +58,7 @@ internal fun DetailMessageBubble(
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             Text(
-                text = sms.body.ifBlank { "(Bos mesaj)" },
+                text = sms.body.ifBlank { "(Boş mesaj)" },
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (isOutgoing) {
                     MaterialTheme.colorScheme.onPrimaryContainer
@@ -103,7 +103,7 @@ internal fun MessageBubble(
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         Text(
-            text = sms.body.ifBlank { "(Bos mesaj)" },
+            text = sms.body.ifBlank { "(Boş mesaj)" },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             minLines = bodyMaxLines,
@@ -141,7 +141,7 @@ internal fun SpamMessageActionRow(
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             )
         ) {
-            Text(text = "Spam degil", style = MaterialTheme.typography.labelLarge)
+            Text(text = "Spam değil", style = MaterialTheme.typography.labelLarge)
         }
         Button(
             onClick = onDelete,

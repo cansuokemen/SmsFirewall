@@ -268,7 +268,7 @@ internal fun ConversationDetailScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Gonder"
+                        contentDescription = "Gönder"
                     )
                 }
             }

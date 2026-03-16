@@ -304,7 +304,7 @@ internal fun buildConversations(
 
             SmsConversation(
                 senderKey = senderKey.ifBlank { "unknown_sender_${latestMessage.id}" },
-                displaySender = latestMessage.sender.ifBlank { "Bilinmeyen gonderici" },
+                displaySender = latestMessage.sender.ifBlank { "Bilinmeyen gönderici" },
                 messages = sortedMessages,
                 latestReceivedAt = latestMessage.receivedAt,
                 unreadCount = unread
@@ -481,7 +481,7 @@ internal fun formatConversationTimestamp(timestampMs: Long): String {
         yesterday.get(Calendar.DAY_OF_YEAR) == msgTime.get(Calendar.DAY_OF_YEAR)
 
     if (isYesterday) {
-        return "Dun"
+        return "Dün"
     }
 
     val isSameYear = now.get(Calendar.YEAR) == msgTime.get(Calendar.YEAR)
@@ -503,12 +503,12 @@ internal fun formatDateHeader(timestampMs: Long): String {
 
     val isToday = now.get(Calendar.YEAR) == msgTime.get(Calendar.YEAR) &&
         now.get(Calendar.DAY_OF_YEAR) == msgTime.get(Calendar.DAY_OF_YEAR)
-    if (isToday) return "Bugun"
+    if (isToday) return "Bugün"
 
     val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
     val isYesterday = yesterday.get(Calendar.YEAR) == msgTime.get(Calendar.YEAR) &&
         yesterday.get(Calendar.DAY_OF_YEAR) == msgTime.get(Calendar.DAY_OF_YEAR)
-    if (isYesterday) return "Dun"
+    if (isYesterday) return "Dün"
 
     val isSameYear = now.get(Calendar.YEAR) == msgTime.get(Calendar.YEAR)
     return if (isSameYear) {

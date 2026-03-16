@@ -32,17 +32,17 @@ internal fun NotificationWarningCard(onOpenSettings: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = "Bildirim acilir penceresi kapali olabilir.",
+                text = "Bildirim açılır penceresi kapalı olabilir.",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
             Text(
-                text = "SMS'leri acilir pencere olarak gormek icin bildirim kanal ayarlarindan ekranda goster secenegini acin.",
+                text = "SMS'leri açılır pencere olarak görmek için bildirim kanal ayarlarından ekranda göster seçeneğini açın.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
             Button(onClick = onOpenSettings) {
-                Text(text = "Ayarlari Ac")
+                Text(text = "Ayarları Aç")
             }
         }
     }
@@ -69,7 +69,7 @@ internal fun SpamAutoDeleteWarningCard() {
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "Spam mesajlar 30 gun sonra otomatik olarak silinecektir.",
+                text = "Spam mesajlar 30 gün sonra otomatik olarak silinecektir.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )

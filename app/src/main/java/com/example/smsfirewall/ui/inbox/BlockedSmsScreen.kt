@@ -276,9 +276,9 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                                         sms = sms
                                     )
                                     if (moved) {
-                                        Toast.makeText(context, "Mesaj normal kutuya tasindi", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Mesaj normal kutuya taşındı", Toast.LENGTH_SHORT).show()
                                     } else {
-                                        Toast.makeText(context, "Mesaj tasinamadi", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Mesaj taşınamadı", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             },
@@ -290,7 +290,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                                 scope.launch {
                                     val sent = sendAndStoreMessage(sender, messageBody)
                                     if (!sent) {
-                                        Toast.makeText(context, "Mesaj gonderilemedi", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Mesaj gönderilemedi", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             }
@@ -307,11 +307,11 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                             scope.launch {
                                 val sent = sendAndStoreMessage(destinationAddress, messageBody)
                                 if (sent) {
-                                    Toast.makeText(context, "Mesaj gonderildi", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Mesaj gönderildi", Toast.LENGTH_SHORT).show()
                                     isNewMessageScreenOpen = false
                                     selectedTab = InboxTab.MESSAGES
                                 } else {
-                                    Toast.makeText(context, "Mesaj gonderilemedi", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Mesaj gönderilemedi", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         }
@@ -434,12 +434,12 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                                                 onMuteNotifications = {
                                                     mutedSenderStore.mute(conversation.displaySender)
                                                     mutedSendersChangeToken++
-                                                    Toast.makeText(context, "Bildirim kapatildi", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, "Bildirim kapatıldı", Toast.LENGTH_SHORT).show()
                                                 },
                                                 onUnmuteNotifications = {
                                                     mutedSenderStore.unmute(conversation.displaySender)
                                                     mutedSendersChangeToken++
-                                                    Toast.makeText(context, "Bildirim acildi", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, "Bildirim açıldı", Toast.LENGTH_SHORT).show()
                                                 }
                                             )
                                         }
@@ -540,7 +540,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
         val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         AlertDialog(
             onDismissRequest = { selectedForDelete = null },
-            title = { Text(text = "Mesaj secenekleri") },
+            title = { Text(text = "Mesaj seçenekleri") },
             text = {
                 Column {
                     TextButton(
@@ -549,7 +549,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                             clipboardManager.setPrimaryClip(
                                 android.content.ClipData.newPlainText("SMS", sms.body)
                             )
-                            Toast.makeText(context, "Mesaj kopyalandi", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Mesaj kopyalandı", Toast.LENGTH_SHORT).show()
                             selectedForDelete = null
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -565,7 +565,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text(text = "Mesaji kopyala")
+                            Text(text = "Mesajı kopyala")
                         }
                     }
                     TextButton(
@@ -595,7 +595,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = "Mesaji sil",
+                                text = "Mesajı sil",
                                 color = MaterialTheme.colorScheme.error
                             )
                         }
@@ -605,7 +605,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { selectedForDelete = null }) {
-                    Text(text = "Iptal")
+                    Text(text = "İptal")
                 }
             }
         )
@@ -615,7 +615,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
         AlertDialog(
             onDismissRequest = { openedSpamMessage = null },
             title = { Text(text = "Spam mesaj") },
-            text = { Text(text = openedSpamMessage?.body.orEmpty().ifBlank { "(Bos mesaj)" }) },
+            text = { Text(text = openedSpamMessage?.body.orEmpty().ifBlank { "(Boş mesaj)" }) },
             confirmButton = {
                 TextButton(onClick = { openedSpamMessage = null }) {
                     Text(text = "Kapat")
@@ -755,7 +755,7 @@ private fun ConversationListItem(
                                 val latestMessage = conversation.messages.lastOrNull()
                                 if (latestMessage != null) {
                                     Text(
-                                        text = latestMessage.body.ifBlank { "(Bos mesaj)" },
+                                        text = latestMessage.body.ifBlank { "(Boş mesaj)" },
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = if (hasUnread) {
                                             MaterialTheme.colorScheme.onSurface
@@ -832,7 +832,7 @@ private fun ConversationListItem(
                     if (isNotificationsMuted) {
                         SwipeActionButton(
                             icon = Icons.Outlined.Notifications,
-                            contentDescription = "Bildirimi yeniden ac",
+                            contentDescription = "Bildirimi yeniden aç",
                             onClick = {
                                 onHideActions()
                                 onUnmuteNotifications()
@@ -851,7 +851,7 @@ private fun ConversationListItem(
                     Spacer(modifier = Modifier.width(4.dp))
                     SwipeActionButton(
                         icon = Icons.Outlined.Delete,
-                        contentDescription = "Konusmayi sil",
+                        contentDescription = "Konuşmayı sil",
                         onClick = {
                             onHideActions()
                             onSwipeDeleteConversation()
