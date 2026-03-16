@@ -362,6 +362,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                                                 getContactName(conversation.displaySender)
                                             }
                                             ConversationListItem(
+                                                modifier = Modifier.animateItem(),
                                                 conversation = conversation,
                                                 contactName = contactName,
                                                 isNotificationsMuted = isSenderMuted,
@@ -546,6 +547,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun ConversationListItem(
+    modifier: Modifier = Modifier,
     conversation: SmsConversation,
     contactName: String?,
     isNotificationsMuted: Boolean,
@@ -593,6 +595,7 @@ private fun ConversationListItem(
     val hasUnread = conversation.unreadCount > 0
 
     SwipeToDismissBox(
+        modifier = modifier,
         state = dismissState,
         enableDismissFromStartToEnd = true,
         enableDismissFromEndToStart = true,
