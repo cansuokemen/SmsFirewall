@@ -63,6 +63,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -118,6 +119,25 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     var mutedSendersChangeToken by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     val conversationListState = rememberLazyListState()
+
+    // FAB/bottom bar scroll'da gizleme
+    var previousIndex by remember { mutableIntStateOf(0) }
+    var previousOffset by remember { mutableIntStateOf(0) }
+    val isBottomBarVisible by remember {
+        derivedStateOf {
+            if (conversationListState.firstVisibleItemIndex != previousIndex) {
+                (previousIndex > conversationListState.firstVisibleItemIndex).also {
+                    previousIndex = conversationListState.firstVisibleItemIndex
+                    previousOffset = conversationListState.firstVisibleItemScrollOffset
+                }
+            } else {
+                (previousOffset >= conversationListState.firstVisibleItemScrollOffset).also {
+                    previousOffset = conversationListState.firstVisibleItemScrollOffset
+                }
+            }
+        }
+    }
+
     var selectedForDelete by remember { mutableStateOf<SmsEntity?>(null) }
     var openedSpamMessage by remember { mutableStateOf<SmsEntity?>(null) }
     var selectedTab by remember { mutableStateOf(InboxTab.MESSAGES) }
@@ -419,9 +439,14 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                         }
 
                         // Bottom bar with search and FAB
+                        AnimatedVisibility(
+                            visible = isBottomBarVisible,
+                            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                            modifier = Modifier.align(Alignment.BottomCenter)
+                        ) {
                         Row(
                             modifier = Modifier
-                                .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
                                 .padding(horizontal = 12.dp, vertical = 12.dp)
                                 .background(
@@ -494,6 +519,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                                 }
                             }
                         }
+                        } // AnimatedVisibility
                     }
                 }
             }
