@@ -39,9 +39,9 @@ internal const val MESSAGE_TYPE_INBOX = 1
 internal const val MESSAGE_TYPE_SENT = 2
 private const val TAG = "SmsUtils"
 
-internal enum class InboxTab(val title: String) {
-    MESSAGES("Mesajlar"),
-    SPAM("Spam")
+internal enum class InboxTab(val titleResId: Int) {
+    MESSAGES(com.example.smsfirewall.R.string.tab_messages),
+    SPAM(com.example.smsfirewall.R.string.tab_spam)
 }
 
 internal data class SmsConversation(

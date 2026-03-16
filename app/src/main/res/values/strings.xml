@@ -1,3 +1,71 @@
 <resources>
     <string name="app_name">SmsFirewall</string>
+
+    <!-- Tabs -->
+    <string name="tab_messages">Mesajlar</string>
+    <string name="tab_spam">Spam</string>
+
+    <!-- Search -->
+    <string name="search_placeholder">Kelime veya numara ara</string>
+
+    <!-- Empty states -->
+    <string name="empty_messages_title">Henüz mesaj yok</string>
+    <string name="empty_messages_subtitle">Gelen mesajlarınız burada görünecek</string>
+    <string name="empty_spam_title">Spam mesaj yok</string>
+    <string name="empty_spam_subtitle">Engellenen mesajlar burada görünecek</string>
+    <string name="empty_search_title">Sonuç bulunamadı</string>
+    <string name="empty_search_subtitle">Farklı bir arama terimi deneyin</string>
+
+    <!-- Message actions -->
+    <string name="message_options">Mesaj seçenekleri</string>
+    <string name="copy_message">Mesajı kopyala</string>
+    <string name="delete_message">Mesajı sil</string>
+    <string name="cancel">İptal</string>
+    <string name="delete">Sil</string>
+    <string name="close">Kapat</string>
+    <string name="not_spam">Spam değil</string>
+    <string name="spam_message">Spam mesaj</string>
+    <string name="empty_message_placeholder">(Boş mesaj)</string>
+    <string name="reason_prefix">Neden: %1$s</string>
+
+    <!-- Conversation actions -->
+    <string name="delete_conversation">Konuşmayı sil</string>
+    <string name="mute_notifications">Bildirimleri kapat</string>
+    <string name="unmute_notifications">Bildirimi yeniden aç</string>
+
+    <!-- Navigation -->
+    <string name="back">Geri</string>
+    <string name="new_message">Yeni Mesaj</string>
+    <string name="send">Gönder</string>
+
+    <!-- New message screen -->
+    <string name="phone_number">Numara</string>
+    <string name="message_label">Mesaj</string>
+    <string name="message_placeholder">Mesajınızı yazın</string>
+    <string name="pick_from_contacts">Rehberden seç</string>
+
+    <!-- Toast messages -->
+    <string name="message_moved">Mesaj normal kutuya taşındı</string>
+    <string name="message_move_failed">Mesaj taşınamadı</string>
+    <string name="message_sent">Mesaj gönderildi</string>
+    <string name="message_send_failed">Mesaj gönderilemedi</string>
+    <string name="message_copied">Mesaj kopyalandı</string>
+    <string name="notifications_muted">Bildirim kapatıldı</string>
+    <string name="notifications_unmuted">Bildirim açıldı</string>
+    <string name="contact_pick_failed">Kişi seçilemedi</string>
+    <string name="number_not_found">Numara bulunamadı</string>
+    <string name="enter_number">Numara girin</string>
+    <string name="message_empty">Mesaj boş olamaz</string>
+    <string name="contacts_open_failed">Rehber açılamadı</string>
+
+    <!-- Warning cards -->
+    <string name="notification_warning_title">Bildirim açılır penceresi kapalı olabilir.</string>
+    <string name="notification_warning_body">SMS\'leri açılır pencere olarak görmek için bildirim kanal ayarlarından ekranda göster seçeneğini açın.</string>
+    <string name="open_settings">Ayarları Aç</string>
+    <string name="spam_auto_delete_warning">Spam mesajlar 30 gün sonra otomatik olarak silinecektir.</string>
+
+    <!-- Date/time -->
+    <string name="today">Bugün</string>
+    <string name="yesterday">Dün</string>
+    <string name="unknown_sender">Bilinmeyen gönderici</string>
 </resources>

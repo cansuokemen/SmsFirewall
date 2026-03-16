@@ -18,7 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.smsfirewall.R
 
 @Composable
 internal fun NotificationWarningCard(onOpenSettings: () -> Unit) {
@@ -32,17 +34,17 @@ internal fun NotificationWarningCard(onOpenSettings: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = "Bildirim açılır penceresi kapalı olabilir.",
+                text = stringResource(R.string.notification_warning_title),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
             Text(
-                text = "SMS'leri açılır pencere olarak görmek için bildirim kanal ayarlarından ekranda göster seçeneğini açın.",
+                text = stringResource(R.string.notification_warning_body),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
             Button(onClick = onOpenSettings) {
-                Text(text = "Ayarları Aç")
+                Text(text = stringResource(R.string.open_settings))
             }
         }
     }
@@ -69,7 +71,7 @@ internal fun SpamAutoDeleteWarningCard() {
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "Spam mesajlar 30 gün sonra otomatik olarak silinecektir.",
+                text = stringResource(R.string.spam_auto_delete_warning),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )

@@ -17,7 +17,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.smsfirewall.R
 
 @Composable
 internal fun EmptyStateView(
@@ -56,8 +58,8 @@ internal fun EmptyStateView(
 internal fun MessagesEmptyState(modifier: Modifier = Modifier) {
     EmptyStateView(
         icon = Icons.Outlined.MailOutline,
-        title = "Henüz mesaj yok",
-        subtitle = "Gelen mesajlarınız burada görünecek",
+        title = stringResource(R.string.empty_messages_title),
+        subtitle = stringResource(R.string.empty_messages_subtitle),
         modifier = modifier
     )
 }
@@ -66,8 +68,8 @@ internal fun MessagesEmptyState(modifier: Modifier = Modifier) {
 internal fun SpamEmptyState(modifier: Modifier = Modifier) {
     EmptyStateView(
         icon = Icons.Outlined.Shield,
-        title = "Spam mesaj yok",
-        subtitle = "Engellenen mesajlar burada görünecek",
+        title = stringResource(R.string.empty_spam_title),
+        subtitle = stringResource(R.string.empty_spam_subtitle),
         modifier = modifier
     )
 }
@@ -76,8 +78,8 @@ internal fun SpamEmptyState(modifier: Modifier = Modifier) {
 internal fun SearchEmptyState(modifier: Modifier = Modifier) {
     EmptyStateView(
         icon = Icons.Outlined.Search,
-        title = "Sonuç bulunamadı",
-        subtitle = "Farklı bir arama terimi deneyin",
+        title = stringResource(R.string.empty_search_title),
+        subtitle = stringResource(R.string.empty_search_subtitle),
         modifier = modifier
     )
 }

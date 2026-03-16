@@ -67,6 +67,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -83,6 +84,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -149,12 +151,21 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     var conversationSearchQuery by remember { mutableStateOf("") }
     val shouldShowNotificationWarning = shouldShowNotificationPopupWarning(context)
 
-    // Contact name cache
-    val contactNameCache = remember { mutableMapOf<String, String?>() }
+    // Contact name cache (async - IO thread'de resolve edilir)
+    val contactNameCache = remember { mutableStateMapOf<String, String?>() }
+    val pendingLookups = remember { mutableSetOf<String>() }
     fun getContactName(phoneNumber: String): String? {
-        return contactNameCache.getOrPut(phoneNumber) {
-            resolveContactName(context, phoneNumber)
+        if (phoneNumber in contactNameCache) return contactNameCache[phoneNumber]
+        if (phoneNumber !in pendingLookups) {
+            pendingLookups.add(phoneNumber)
+            scope.launch {
+                val name = withContext(Dispatchers.IO) {
+                    resolveContactName(context, phoneNumber)
+                }
+                contactNameCache[phoneNumber] = name
+            }
         }
+        return null
     }
 
     val openNotificationSettings: () -> Unit = {
@@ -335,7 +346,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                                         onClick = { selectedTab = tab },
                                         text = {
                                             Text(
-                                                text = tab.title,
+                                                text = stringResource(tab.titleResId),
                                                 style = MaterialTheme.typography.labelLarge
                                             )
                                         }
