@@ -1,82 +1,70 @@
 package com.example.smsfirewall.ui.inbox
 
-import android.Manifest
-import android.app.Activity
 import android.app.NotificationManager
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.database.ContentObserver
-import android.net.Uri
-import android.os.Handler
 import android.os.Build
-import android.os.Looper
-import android.provider.ContactsContract
 import android.provider.Settings
-import android.provider.Telephony
-import android.telephony.SmsManager
-import android.util.Log
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -85,26 +73,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import com.example.smsfirewall.R
 import com.example.smsfirewall.data.SpamRetentionPolicy
 import com.example.smsfirewall.data.SmsRepository
@@ -112,25 +92,15 @@ import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationConstants
-import com.example.smsfirewall.ui.theme.SmsFirewallTheme
-import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class InboxTab(val title: String) {
-    MESSAGES("Mesajlar"),
-    SPAM("Spam")
+private enum class ScreenState {
+    LIST, DETAIL, NEW_MESSAGE
 }
 
-private data class SmsConversation(
-    val senderKey: String,
-    val displaySender: String,
-    val messages: List<SmsEntity>,
-    val latestReceivedAt: Long
-)
-
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -151,6 +121,14 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     var conversationSearchInput by remember { mutableStateOf("") }
     var conversationSearchQuery by remember { mutableStateOf("") }
     val shouldShowNotificationWarning = shouldShowNotificationPopupWarning(context)
+
+    // Contact name cache
+    val contactNameCache = remember { mutableMapOf<String, String?>() }
+    fun getContactName(phoneNumber: String): String? {
+        return contactNameCache.getOrPut(phoneNumber) {
+            resolveContactName(context, phoneNumber)
+        }
+    }
 
     val openNotificationSettings: () -> Unit = {
         val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -185,10 +163,11 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     val openedConversation = remember(openedConversationKey, visibleConversations) {
         openedConversationKey?.let { key -> visibleConversations.firstOrNull { it.senderKey == key } }
     }
-    val emptyMessage = if (selectedTab == InboxTab.MESSAGES) {
-        "Mesaj bulunamadi"
-    } else {
-        "Spam bulunamadi"
+
+    val currentScreen = when {
+        openedConversation != null -> ScreenState.DETAIL
+        isNewMessageScreenOpen -> ScreenState.NEW_MESSAGE
+        else -> ScreenState.LIST
     }
 
     LaunchedEffect(openedConversationKey, openedConversation) {
@@ -214,10 +193,6 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
         }
     }
 
-    fun applyConversationSearch() {
-        conversationSearchQuery = conversationSearchInput.trim()
-    }
-
     suspend fun sendAndStoreMessage(destinationAddress: String, messageBody: String): Boolean {
         val sent = sendSmsMessage(
             context = context,
@@ -237,288 +212,269 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
         return true
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(12.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            if (openedConversation != null) {
-                ConversationDetailScreen(
-                    conversation = openedConversation,
-                    canSendMessage = selectedTab == InboxTab.MESSAGES,
-                    isSpamConversation = selectedTab == InboxTab.SPAM,
-                    onBack = { openedConversationKey = null },
-                    onMessageLongPress = { sms -> selectedForDelete = sms },
-                    onSpamMessageClick = { sms -> openedSpamMessage = sms },
-                    onMarkAsNotSpam = { sms ->
-                        scope.launch {
-                            val moved = moveSpamToSystemInbox(
-                                context = context,
-                                repository = repository,
-                                sms = sms
-                            )
-                            if (moved) {
-                                Toast.makeText(
-                                    context,
-                                    "Mesaj normal kutuya tasindi",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            } else {
-                                Toast.makeText(
-                                    context,
-                                    "Mesaj tasinamadi",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                    },
-                    onDeleteSpam = { sms ->
-                        scope.launch {
-                            repository.delete(sms)
-                        }
-                    },
-                    onSendMessage = { messageBody ->
-                        val sender = openedConversation.displaySender
-                        scope.launch {
-                            val sent = sendAndStoreMessage(
-                                destinationAddress = sender,
-                                messageBody = messageBody
-                            )
-                            if (!sent) {
-                                Toast.makeText(
-                                    context,
-                                    "Mesaj gonderilemedi",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                    }
-                )
-            } else if (isNewMessageScreenOpen) {
-                NewMessageScreen(
-                    onBack = { isNewMessageScreenOpen = false },
-                    onSendMessage = { destinationAddress, messageBody ->
-                        scope.launch {
-                            val sent = sendAndStoreMessage(
-                                destinationAddress = destinationAddress,
-                                messageBody = messageBody
-                            )
-                            if (sent) {
-                                Toast.makeText(
-                                    context,
-                                    "Mesaj gonderildi",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                                isNewMessageScreenOpen = false
-                                selectedTab = InboxTab.MESSAGES
-                            } else {
-                                Toast.makeText(
-                                    context,
-                                    "Mesaj gonderilemedi",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                    }
-                )
-            } else {
-                if (shouldShowNotificationWarning) {
-                    NotificationWarningCard(onOpenSettings = openNotificationSettings)
-                }
-
-                TabRow(
-                    selectedTabIndex = selectedTab.ordinal,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    InboxTab.entries.forEach { tab ->
-                        Tab(
-                            selected = selectedTab == tab,
-                            onClick = { selectedTab = tab },
-                            text = { Text(text = tab.title) }
-                        )
-                    }
-                }
-
-                if (selectedTab == InboxTab.SPAM) {
-                    SpamAutoDeleteWarningCard()
-                }
-
-                if (filteredConversations.isEmpty()) {
-                    Text(
-                        text = if (conversationSearchQuery.isBlank()) {
-                            emptyMessage
-                        } else {
-                            "Arama sonucu bulunamadi"
-                        },
-                        modifier = Modifier.padding(top = 12.dp)
-                    )
+    Box(modifier = modifier.fillMaxSize()) {
+        AnimatedContent(
+            targetState = currentScreen,
+            transitionSpec = {
+                if (targetState == ScreenState.LIST) {
+                    (slideInHorizontally { -it } + fadeIn()) togetherWith
+                        (slideOutHorizontally { it } + fadeOut())
                 } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 12.dp, bottom = 92.dp),
-                        state = conversationListState,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(filteredConversations, key = { it.senderKey }) { conversation ->
-                            val isSenderMuted = remember(conversation.senderKey, mutedSendersChangeToken) {
-                                mutedSenderStore.isMuted(conversation.displaySender)
-                            }
-                            ConversationListItem(
-                                conversation = conversation,
-                                isNotificationsMuted = isSenderMuted,
-                                showReason = selectedTab == InboxTab.SPAM,
-                                onOpenConversation = {
-                                    isNewMessageScreenOpen = false
-                                    actionRevealedConversationKey = null
-                                    openedConversationKey = conversation.senderKey
-                                },
-                                isActionsVisible = actionRevealedConversationKey == conversation.senderKey,
-                                onShowActions = {
-                                    actionRevealedConversationKey = conversation.senderKey
-                                },
-                                onHideActions = {
-                                    if (actionRevealedConversationKey == conversation.senderKey) {
-                                        actionRevealedConversationKey = null
+                    (slideInHorizontally { it } + fadeIn()) togetherWith
+                        (slideOutHorizontally { -it } + fadeOut())
+                }
+            },
+            label = "screen_transition"
+        ) { screen ->
+            when (screen) {
+                ScreenState.DETAIL -> {
+                    val conv = openedConversation
+                    if (conv != null) {
+                        ConversationDetailScreen(
+                            conversation = conv,
+                            contactName = getContactName(conv.displaySender),
+                            canSendMessage = selectedTab == InboxTab.MESSAGES,
+                            isSpamConversation = selectedTab == InboxTab.SPAM,
+                            onBack = { openedConversationKey = null },
+                            onMessageLongPress = { sms -> selectedForDelete = sms },
+                            onSpamMessageClick = { sms -> openedSpamMessage = sms },
+                            onMarkAsNotSpam = { sms ->
+                                scope.launch {
+                                    val moved = moveSpamToSystemInbox(
+                                        context = context,
+                                        repository = repository,
+                                        sms = sms
+                                    )
+                                    if (moved) {
+                                        Toast.makeText(context, "Mesaj normal kutuya tasindi", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "Mesaj tasinamadi", Toast.LENGTH_SHORT).show()
                                     }
-                                },
-                                onMessageLongPress = { sms -> selectedForDelete = sms },
-                                onSwipeDeleteConversation = {
-                                    scope.launch {
-                                        actionRevealedConversationKey = null
-                                        conversation.messages.forEach { sms ->
-                                            if (selectedTab == InboxTab.MESSAGES) {
-                                                deleteSmsFromSystemProvider(context, sms.id)
-                                            } else {
-                                                repository.delete(sms)
-                                            }
-                                        }
-                                    }
-                                },
-                                onMuteNotifications = {
-                                    mutedSenderStore.mute(conversation.displaySender)
-                                    mutedSendersChangeToken++
-                                    Toast.makeText(
-                                        context,
-                                        "Bu gonderici icin bildirim kapatildi",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                },
-                                onUnmuteNotifications = {
-                                    mutedSenderStore.unmute(conversation.displaySender)
-                                    mutedSendersChangeToken++
-                                    Toast.makeText(
-                                        context,
-                                        "Bu gonderici icin bildirim yeniden acildi",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
                                 }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        if (openedConversation == null && !isNewMessageScreenOpen) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
-                    .imePadding()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 6.dp, end = 6.dp, top = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = conversationSearchInput,
-                        onValueChange = { value ->
-                            conversationSearchInput = value
-                            conversationSearchQuery = value.trim()
-                        },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        shape = RoundedCornerShape(
-                            topStart = 28.dp,
-                            bottomStart = 28.dp,
-                            topEnd = 0.dp,
-                            bottomEnd = 0.dp
-                        ),
-                        placeholder = { Text(text = "Kelime veya numara ara") },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            focusedBorderColor = MaterialTheme.colorScheme.primaryContainer,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.primaryContainer,
-                            cursorColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            focusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            focusedPlaceholderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                            unfocusedPlaceholderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                        ),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(
-                            onSearch = {
-                                applyConversationSearch()
-                                focusManager.clearFocus()
-                                keyboardController?.hide()
+                            },
+                            onDeleteSpam = { sms ->
+                                scope.launch { repository.delete(sms) }
+                            },
+                            onSendMessage = { messageBody ->
+                                val sender = conv.displaySender
+                                scope.launch {
+                                    val sent = sendAndStoreMessage(sender, messageBody)
+                                    if (!sent) {
+                                        Toast.makeText(context, "Mesaj gonderilemedi", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
                             }
                         )
-                    )
-                    FloatingActionButton(
-                        onClick = {
-                            applyConversationSearch()
-                            focusManager.clearFocus()
-                            keyboardController?.hide()
-                        },
-                        modifier = Modifier.size(56.dp),
-                        shape = RoundedCornerShape(
-                            topStart = 0.dp,
-                            bottomStart = 0.dp,
-                            topEnd = 16.dp,
-                            bottomEnd = 16.dp
-                        ),
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Search,
-                            contentDescription = "Mesaj ara"
-                        )
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize())
                     }
-                    if (selectedTab == InboxTab.MESSAGES) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        FloatingActionButton(
-                            onClick = {
-                                selectedTab = InboxTab.MESSAGES
-                                openedConversationKey = null
-                                actionRevealedConversationKey = null
-                                isNewMessageScreenOpen = true
-                            },
-                            modifier = Modifier.size(56.dp)
+                }
+
+                ScreenState.NEW_MESSAGE -> {
+                    NewMessageScreen(
+                        onBack = { isNewMessageScreenOpen = false },
+                        onSendMessage = { destinationAddress, messageBody ->
+                            scope.launch {
+                                val sent = sendAndStoreMessage(destinationAddress, messageBody)
+                                if (sent) {
+                                    Toast.makeText(context, "Mesaj gonderildi", Toast.LENGTH_SHORT).show()
+                                    isNewMessageScreenOpen = false
+                                    selectedTab = InboxTab.MESSAGES
+                                } else {
+                                    Toast.makeText(context, "Mesaj gonderilemedi", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    )
+                }
+
+                ScreenState.LIST -> {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+                            if (shouldShowNotificationWarning) {
+                                NotificationWarningCard(onOpenSettings = openNotificationSettings)
+                            }
+
+                            SecondaryTabRow(
+                                selectedTabIndex = selectedTab.ordinal,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                InboxTab.entries.forEach { tab ->
+                                    Tab(
+                                        selected = selectedTab == tab,
+                                        onClick = { selectedTab = tab },
+                                        text = {
+                                            Text(
+                                                text = tab.title,
+                                                style = MaterialTheme.typography.labelLarge
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+
+                            if (selectedTab == InboxTab.SPAM) {
+                                SpamAutoDeleteWarningCard()
+                            }
+
+                            if (filteredConversations.isEmpty()) {
+                                if (conversationSearchQuery.isNotBlank()) {
+                                    SearchEmptyState()
+                                } else if (selectedTab == InboxTab.MESSAGES) {
+                                    MessagesEmptyState()
+                                } else {
+                                    SpamEmptyState()
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(top = 8.dp, bottom = 80.dp),
+                                    state = conversationListState,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    items(filteredConversations, key = { it.senderKey }) { conversation ->
+                                        val isSenderMuted = remember(conversation.senderKey, mutedSendersChangeToken) {
+                                            mutedSenderStore.isMuted(conversation.displaySender)
+                                        }
+                                        val contactName = remember(conversation.displaySender) {
+                                            getContactName(conversation.displaySender)
+                                        }
+                                        ConversationListItem(
+                                            conversation = conversation,
+                                            contactName = contactName,
+                                            isNotificationsMuted = isSenderMuted,
+                                            showReason = selectedTab == InboxTab.SPAM,
+                                            onOpenConversation = {
+                                                isNewMessageScreenOpen = false
+                                                actionRevealedConversationKey = null
+                                                openedConversationKey = conversation.senderKey
+                                            },
+                                            isActionsVisible = actionRevealedConversationKey == conversation.senderKey,
+                                            onShowActions = {
+                                                actionRevealedConversationKey = conversation.senderKey
+                                            },
+                                            onHideActions = {
+                                                if (actionRevealedConversationKey == conversation.senderKey) {
+                                                    actionRevealedConversationKey = null
+                                                }
+                                            },
+                                            onMessageLongPress = { sms -> selectedForDelete = sms },
+                                            onSwipeDeleteConversation = {
+                                                scope.launch {
+                                                    actionRevealedConversationKey = null
+                                                    conversation.messages.forEach { sms ->
+                                                        if (selectedTab == InboxTab.MESSAGES) {
+                                                            deleteSmsFromSystemProvider(context, sms.id)
+                                                        } else {
+                                                            repository.delete(sms)
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            onMuteNotifications = {
+                                                mutedSenderStore.mute(conversation.displaySender)
+                                                mutedSendersChangeToken++
+                                                Toast.makeText(context, "Bildirim kapatildi", Toast.LENGTH_SHORT).show()
+                                            },
+                                            onUnmuteNotifications = {
+                                                mutedSenderStore.unmute(conversation.displaySender)
+                                                mutedSendersChangeToken++
+                                                Toast.makeText(context, "Bildirim acildi", Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Bottom bar with search and FAB
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 12.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.background,
+                                    RoundedCornerShape(28.dp)
+                                )
+                                .imePadding(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_message_send),
-                                contentDescription = "Yeni mesaj"
+                            OutlinedTextField(
+                                value = conversationSearchInput,
+                                onValueChange = { value ->
+                                    conversationSearchInput = value
+                                    conversationSearchQuery = value.trim()
+                                },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                shape = RoundedCornerShape(28.dp),
+                                placeholder = {
+                                    Text(
+                                        text = "Kelime veya numara ara",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.Search,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    cursorColor = MaterialTheme.colorScheme.primary,
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                ),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(
+                                    onSearch = {
+                                        conversationSearchQuery = conversationSearchInput.trim()
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
+                                    }
+                                )
                             )
+                            if (selectedTab == InboxTab.MESSAGES) {
+                                FloatingActionButton(
+                                    onClick = {
+                                        selectedTab = InboxTab.MESSAGES
+                                        openedConversationKey = null
+                                        actionRevealedConversationKey = null
+                                        isNewMessageScreenOpen = true
+                                    },
+                                    modifier = Modifier.size(56.dp),
+                                    shape = CircleShape,
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_message_send),
+                                        contentDescription = "Yeni mesaj"
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
-
         }
     }
 
     if (selectedForDelete != null) {
         AlertDialog(
             onDismissRequest = { selectedForDelete = null },
-            title = { Text(text = "Delete message") },
-            text = { Text(text = "Delete selected message?") },
+            title = { Text(text = "Mesaji sil") },
+            text = { Text(text = "Secili mesaj silinsin mi?") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -533,12 +489,12 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                         }
                     }
                 ) {
-                    Text(text = "Delete")
+                    Text(text = "Sil", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { selectedForDelete = null }) {
-                    Text(text = "Cancel")
+                    Text(text = "Iptal")
                 }
             }
         )
@@ -558,320 +514,11 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-private fun NotificationWarningCard(onOpenSettings: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 12.dp)
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(text = "Notification popup might be disabled.")
-            Text(text = "To see SMS as pop-up, open notification channel settings and enable pop on screen.")
-            Button(onClick = onOpenSettings) {
-                Text(text = "Open Settings")
-            }
-        }
-    }
-}
-
-@Composable
-private fun SpamAutoDeleteWarningCard() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFFFF4CC))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            painter = painterResource(id = android.R.drawable.ic_dialog_alert),
-            contentDescription = "Uyarı",
-            tint = Color(0xFFF2B300)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text = "Spam mesajlar 30 gün sonra otomatik olarak silinecektir.")
-    }
-}
-
-private fun shouldShowNotificationPopupWarning(context: android.content.Context): Boolean {
-    if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
-        return true
-    }
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        val manager = context.getSystemService(NotificationManager::class.java)
-        val channel = manager?.getNotificationChannel(NotificationConstants.ALLOWED_SMS_CHANNEL_ID)
-        if (channel == null) {
-            return true
-        }
-        return channel.importance < NotificationManager.IMPORTANCE_HIGH
-    }
-
-    return false
-}
-
-@Composable
-private fun rememberSystemMessages(context: Context): List<SmsEntity> {
-    var refreshToken by remember { mutableIntStateOf(0) }
-
-    DisposableEffect(context) {
-        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
-            override fun onChange(selfChange: Boolean) {
-                refreshToken++
-            }
-
-            override fun onChange(selfChange: Boolean, uri: android.net.Uri?) {
-                refreshToken++
-            }
-        }
-
-        context.contentResolver.registerContentObserver(
-            Telephony.Sms.CONTENT_URI,
-            true,
-            observer
-        )
-
-        onDispose {
-            context.contentResolver.unregisterContentObserver(observer)
-        }
-    }
-
-    val messages by produceState(initialValue = emptyList<SmsEntity>(), context, refreshToken) {
-        value = withContext(Dispatchers.IO) {
-            querySystemMessages(context)
-        }
-    }
-
-    return messages
-}
-
-private fun querySystemMessages(context: Context): List<SmsEntity> {
-    val projection = arrayOf("_id", "address", "body", "date", "type")
-    val selection = "type IN (?, ?)"
-    val selectionArgs = arrayOf(MESSAGE_TYPE_INBOX.toString(), MESSAGE_TYPE_SENT.toString())
-    val sortOrder = "date ASC"
-
-    return runCatching {
-        context.contentResolver.query(
-            Telephony.Sms.CONTENT_URI,
-            projection,
-            selection,
-            selectionArgs,
-            sortOrder
-        )?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow("_id")
-            val addressColumn = cursor.getColumnIndexOrThrow("address")
-            val bodyColumn = cursor.getColumnIndexOrThrow("body")
-            val dateColumn = cursor.getColumnIndexOrThrow("date")
-            val typeColumn = cursor.getColumnIndexOrThrow("type")
-
-            buildList {
-                while (cursor.moveToNext()) {
-                    val smsType = cursor.getInt(typeColumn)
-                    add(
-                        SmsEntity(
-                            id = cursor.getLong(idColumn),
-                            sender = cursor.getString(addressColumn).orEmpty(),
-                            body = cursor.getString(bodyColumn).orEmpty(),
-                            receivedAt = cursor.getLong(dateColumn),
-                            status = SmsStatus.ALLOW,
-                            reason = if (smsType == MESSAGE_TYPE_SENT) {
-                                SENT_MESSAGE_REASON
-                            } else {
-                                SYSTEM_PROVIDER_REASON
-                            }
-                        )
-                    )
-                }
-            }
-        }.orEmpty()
-    }.onFailure { throwable ->
-        Log.e(TAG, "Failed to read SMS messages from provider", throwable)
-    }.getOrDefault(emptyList())
-}
-
-private suspend fun deleteSmsFromSystemProvider(context: Context, smsId: Long) {
-    if (smsId <= 0L) return
-
-    withContext(Dispatchers.IO) {
-        runCatching {
-            context.contentResolver.delete(
-                Telephony.Sms.CONTENT_URI,
-                "_id = ?",
-                arrayOf(smsId.toString())
-            )
-        }.onFailure { throwable ->
-            Log.e(TAG, "Failed to delete SMS from provider, id=$smsId", throwable)
-        }
-    }
-}
-
-private suspend fun insertSentSmsIntoSystemProvider(
-    context: Context,
-    destinationAddress: String,
-    messageBody: String,
-    sentAt: Long
-) {
-    withContext(Dispatchers.IO) {
-        val values = ContentValues().apply {
-            put("address", destinationAddress)
-            put("body", messageBody)
-            put("date", sentAt)
-            put("type", MESSAGE_TYPE_SENT)
-            put("read", 1)
-            put("seen", 1)
-        }
-
-        runCatching {
-            context.contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
-        }.onFailure { throwable ->
-            Log.e(TAG, "Failed to insert sent SMS into provider", throwable)
-        }
-    }
-}
-
-private suspend fun moveSpamToSystemInbox(
-    context: Context,
-    repository: SmsRepository,
-    sms: SmsEntity
-): Boolean {
-    val insertedIntoInbox = withContext(Dispatchers.IO) {
-        val values = ContentValues().apply {
-            put(Telephony.Sms.ADDRESS, sms.sender)
-            put(Telephony.Sms.BODY, sms.body)
-            put(Telephony.Sms.DATE, sms.receivedAt)
-            put(Telephony.Sms.READ, 0)
-            put(Telephony.Sms.SEEN, 0)
-        }
-
-        runCatching {
-            context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values) != null
-        }.onFailure { throwable ->
-            Log.e(TAG, "Failed to move spam SMS into inbox", throwable)
-        }.getOrDefault(false)
-    }
-
-    if (!insertedIntoInbox) {
-        return false
-    }
-
-    repository.delete(sms)
-    return true
-}
-
-private fun buildConversations(messages: List<SmsEntity>): List<SmsConversation> {
-    return messages
-        .groupBy { normalizeSenderForGrouping(it.sender) }
-        .mapNotNull { (senderKey, senderMessages) ->
-            if (senderMessages.isEmpty()) {
-                return@mapNotNull null
-            }
-
-            val sortedMessages = senderMessages.sortedBy { it.receivedAt }
-            val latestMessage = sortedMessages.last()
-
-            SmsConversation(
-                senderKey = senderKey.ifBlank { "unknown_sender_${latestMessage.id}" },
-                displaySender = latestMessage.sender.ifBlank { "Unknown sender" },
-                messages = sortedMessages,
-                latestReceivedAt = latestMessage.receivedAt
-            )
-        }
-        .sortedByDescending { it.latestReceivedAt }
-}
-
-private fun normalizeSenderForGrouping(sender: String): String {
-    val alphanumeric = sender
-        .trim()
-        .lowercase(Locale.ROOT)
-        .filter { it.isLetterOrDigit() }
-
-    if (alphanumeric.isBlank()) {
-        return ""
-    }
-
-    return if (alphanumeric.all { it.isDigit() }) {
-        if (alphanumeric.length > PHONE_COMPARE_LENGTH) {
-            alphanumeric.takeLast(PHONE_COMPARE_LENGTH)
-        } else {
-            alphanumeric
-        }
-    } else {
-        alphanumeric
-    }
-}
-
-private fun normalizeForSearch(value: String): String {
-    return value
-        .trim()
-        .lowercase(Locale.ROOT)
-        .filter { it.isLetterOrDigit() }
-}
-
-private fun normalizeDigits(value: String): String {
-    return value.filter { it.isDigit() }
-}
-
-private fun numberLikeMatch(candidate: String, queryDigits: String): Boolean {
-    if (queryDigits.isBlank()) return false
-
-    val candidateDigits = normalizeDigits(candidate)
-    if (candidateDigits.isBlank()) return false
-
-    if (candidateDigits.contains(queryDigits) || queryDigits.contains(candidateDigits)) {
-        return true
-    }
-
-    val candidateLastDigits = if (candidateDigits.length > PHONE_COMPARE_LENGTH) {
-        candidateDigits.takeLast(PHONE_COMPARE_LENGTH)
-    } else {
-        candidateDigits
-    }
-    val queryLastDigits = if (queryDigits.length > PHONE_COMPARE_LENGTH) {
-        queryDigits.takeLast(PHONE_COMPARE_LENGTH)
-    } else {
-        queryDigits
-    }
-
-    return candidateLastDigits.contains(queryLastDigits) || queryLastDigits.contains(candidateLastDigits)
-}
-
-private fun SmsConversation.matchesSearchQuery(query: String): Boolean {
-    val trimmedQuery = query.trim()
-    if (trimmedQuery.isBlank()) return true
-
-    val normalizedQuery = normalizeForSearch(trimmedQuery)
-    val queryDigits = normalizeDigits(trimmedQuery)
-
-    if (displaySender.contains(trimmedQuery, ignoreCase = true)) {
-        return true
-    }
-
-    if (normalizedQuery.isNotBlank() && normalizeForSearch(displaySender).contains(normalizedQuery)) {
-        return true
-    }
-
-    if (numberLikeMatch(displaySender, queryDigits)) {
-        return true
-    }
-
-    return messages.any { sms ->
-        sms.body.contains(trimmedQuery, ignoreCase = true) ||
-            (normalizedQuery.isNotBlank() && normalizeForSearch(sms.body).contains(normalizedQuery)) ||
-            sms.sender.contains(trimmedQuery, ignoreCase = true) ||
-            (normalizedQuery.isNotBlank() && normalizeForSearch(sms.sender).contains(normalizedQuery)) ||
-            numberLikeMatch(sms.sender, queryDigits) ||
-            numberLikeMatch(sms.body, queryDigits)
-    }
-}
-
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun ConversationListItem(
     conversation: SmsConversation,
+    contactName: String?,
     isNotificationsMuted: Boolean,
     showReason: Boolean,
     onOpenConversation: () -> Unit,
@@ -911,42 +558,107 @@ private fun ConversationListItem(
         }
     )
 
+    val displayName = contactName ?: conversation.displaySender
+    val avatarLetter = displayName.firstOrNull()?.uppercase() ?: "?"
+    val avatarColor = avatarColorForSender(conversation.displaySender)
+
     SwipeToDismissBox(
         state = dismissState,
         enableDismissFromStartToEnd = true,
         enableDismissFromEndToStart = true,
-        backgroundContent = {}
+        backgroundContent = {
+            val direction = dismissState.dismissDirection
+            if (direction == SwipeToDismissBoxValue.EndToStart) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(end = 20.dp),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Delete,
+                        contentDescription = "Sil",
+                        tint = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(CONVERSATION_CARD_HEIGHT)
-                    .clickable(onClick = onOpenConversation)
+                    .clickable(onClick = onOpenConversation),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                    // Avatar
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(avatarColor),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Sender: ${conversation.displaySender}",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            text = avatarLetter,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White
                         )
                     }
 
-                    val latestMessage = conversation.messages.lastOrNull()
-                    if (latestMessage != null) {
-                        MessageBubble(
-                            sms = latestMessage,
-                            showReason = showReason,
-                            onClick = onOpenConversation,
-                            onLongPress = { onMessageLongPress(latestMessage) }
-                        )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = displayName,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = formatConversationTimestamp(conversation.latestReceivedAt),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        val latestMessage = conversation.messages.lastOrNull()
+                        if (latestMessage != null) {
+                            Text(
+                                text = latestMessage.body.ifBlank { "(Bos mesaj)" },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = if (showReason) 1 else 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                            if (showReason) {
+                                Text(
+                                    text = "Neden: ${latestMessage.reason}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -955,12 +667,12 @@ private fun ConversationListItem(
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 10.dp, end = 10.dp),
+                        .padding(top = 8.dp, end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (isNotificationsMuted) {
                         SwipeActionButton(
-                            iconRes = android.R.drawable.ic_lock_silent_mode_off,
+                            icon = Icons.Outlined.Notifications,
                             contentDescription = "Bildirimi yeniden ac",
                             onClick = {
                                 onHideActions()
@@ -969,7 +681,7 @@ private fun ConversationListItem(
                         )
                     } else {
                         SwipeActionButton(
-                            iconRes = android.R.drawable.ic_lock_silent_mode,
+                            icon = Icons.Outlined.NotificationsOff,
                             contentDescription = "Bildirimleri kapat",
                             onClick = {
                                 onHideActions()
@@ -977,9 +689,9 @@ private fun ConversationListItem(
                             }
                         )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     SwipeActionButton(
-                        iconRes = android.R.drawable.ic_menu_delete,
+                        icon = Icons.Outlined.Delete,
                         contentDescription = "Konusmayi sil",
                         onClick = {
                             onHideActions()
@@ -992,387 +704,24 @@ private fun ConversationListItem(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun ConversationDetailScreen(
-    conversation: SmsConversation,
-    canSendMessage: Boolean,
-    isSpamConversation: Boolean,
-    onBack: () -> Unit,
-    onMessageLongPress: (SmsEntity) -> Unit,
-    onSpamMessageClick: (SmsEntity) -> Unit,
-    onMarkAsNotSpam: (SmsEntity) -> Unit,
-    onDeleteSpam: (SmsEntity) -> Unit,
-    onSendMessage: (String) -> Unit
-) {
-    var draftMessage by remember(conversation.senderKey) { mutableStateOf("") }
-    val listState = rememberLazyListState()
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val density = LocalDensity.current
-    val displayMessages = remember(conversation.messages) { conversation.messages.asReversed() }
-    val isKeyboardVisible = WindowInsets.ime.getBottom(density) > 0
-
-    LaunchedEffect(displayMessages.size) {
-        if (displayMessages.isNotEmpty()) {
-            listState.scrollToItem(0)
-        }
+private fun shouldShowNotificationPopupWarning(context: Context): Boolean {
+    if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+        return true
     }
 
-    LaunchedEffect(isKeyboardVisible) {
-        if (isKeyboardVisible && displayMessages.isNotEmpty()) {
-            listState.animateScrollToItem(0)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val channel = manager?.getNotificationChannel(NotificationConstants.ALLOWED_SMS_CHANNEL_ID)
+        if (channel == null) {
+            return true
         }
+        return channel.importance < NotificationManager.IMPORTANCE_HIGH
     }
 
-    fun submitMessage() {
-        if (!canSendMessage) return
-        val text = draftMessage.trim()
-        if (text.isBlank()) return
-        onSendMessage(text)
-        draftMessage = ""
-    }
-
-    val handleBack = {
-        focusManager.clearFocus()
-        keyboardController?.hide()
-        onBack()
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .swipeBackGesture(onBack = handleBack)
-            .background(MaterialTheme.colorScheme.background)
-            .padding(top = 12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = handleBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Geri"
-                )
-            }
-            Text(
-                text = conversation.displaySender,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(top = 8.dp),
-            state = listState,
-            reverseLayout = true,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = PaddingValues(bottom = 8.dp)
-        ) {
-            items(displayMessages, key = { it.id }) { sms ->
-                DetailMessageBubble(
-                    sms = sms,
-                    onClick = {
-                        focusManager.clearFocus()
-                        keyboardController?.hide()
-                        if (isSpamConversation) {
-                            onSpamMessageClick(sms)
-                        }
-                    },
-                    onLongPress = { onMessageLongPress(sms) }
-                )
-                if (isSpamConversation) {
-                    SpamMessageActionRow(
-                        onMarkAsNotSpam = { onMarkAsNotSpam(sms) },
-                        onDelete = { onDeleteSpam(sms) }
-                    )
-                }
-            }
-        }
-
-        if (canSendMessage) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
-                    .imePadding()
-                    .padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = draftMessage,
-                    onValueChange = { draftMessage = it },
-                    modifier = Modifier
-                        .weight(1f)
-                        .onPreviewKeyEvent { keyEvent ->
-                            if (keyEvent.type == KeyEventType.KeyUp &&
-                                (keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter)
-                            ) {
-                                submitMessage()
-                                keyboardController?.hide()
-                                true
-                            } else {
-                                false
-                            }
-                        },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(
-                        onSend = {
-                            submitMessage()
-                            keyboardController?.hide()
-                        }
-                    ),
-                    placeholder = { Text(text = "Mesaj yaz") }
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = {
-                        submitMessage()
-                        keyboardController?.hide()
-                    },
-                    enabled = draftMessage.isNotBlank()
-                ) {
-                    Text(text = "Gonder")
-                }
-            }
-        }
-    }
+    return false
 }
 
-@Composable
-private fun SpamMessageActionRow(
-    onMarkAsNotSpam: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Button(
-            onClick = onMarkAsNotSpam,
-            modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        ) {
-            Text(text = "Spam değil")
-        }
-        Button(
-            onClick = onDelete,
-            modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        ) {
-            Text(text = "Sil")
-        }
-    }
-}
-
-@Composable
-private fun NewMessageScreen(
-    onBack: () -> Unit,
-    onSendMessage: (destinationAddress: String, messageBody: String) -> Unit
-) {
-    var destinationAddress by remember { mutableStateOf("") }
-    var draftMessage by remember { mutableStateOf("") }
-    val context = LocalContext.current
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val scope = rememberCoroutineScope()
-    val contactPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode != Activity.RESULT_OK) {
-            return@rememberLauncherForActivityResult
-        }
-
-        val contactUri = result.data?.data
-        if (contactUri == null) {
-            Toast.makeText(context, "Kisi secilemedi", Toast.LENGTH_SHORT).show()
-            return@rememberLauncherForActivityResult
-        }
-
-        scope.launch {
-            val selectedNumber = readPhoneNumberFromPickerUri(
-                context = context,
-                contactUri = contactUri
-            )
-            if (selectedNumber.isNullOrBlank()) {
-                Toast.makeText(context, "Numara bulunamadi", Toast.LENGTH_SHORT).show()
-            } else {
-                destinationAddress = selectedNumber
-            }
-        }
-    }
-
-    fun submitMessage() {
-        val recipient = destinationAddress.trim()
-        val messageBody = draftMessage.trim()
-
-        if (recipient.isBlank()) {
-            Toast.makeText(context, "Numara girin", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (messageBody.isBlank()) {
-            Toast.makeText(context, "Mesaj bos olamaz", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        onSendMessage(recipient, messageBody)
-    }
-
-    val handleBack = {
-        focusManager.clearFocus()
-        keyboardController?.hide()
-        onBack()
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .swipeBackGesture(onBack = handleBack)
-            .background(MaterialTheme.colorScheme.background)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                focusManager.clearFocus()
-                keyboardController?.hide()
-            }
-            .padding(top = 12.dp)
-            .imePadding()
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = handleBack
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Geri"
-                )
-            }
-            Text(text = "Yeni Mesaj")
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = destinationAddress,
-                onValueChange = { destinationAddress = it },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                shape = RoundedCornerShape(
-                    topStart = 28.dp,
-                    bottomStart = 28.dp,
-                    topEnd = 0.dp,
-                    bottomEnd = 0.dp
-                ),
-                label = { Text(text = "Numara") },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    focusedBorderColor = MaterialTheme.colorScheme.primaryContainer,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.primaryContainer,
-                    cursorColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    focusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    focusedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                ),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Phone,
-                    imeAction = ImeAction.Next
-                )
-            )
-            FloatingActionButton(
-                onClick = {
-                    focusManager.clearFocus()
-                    keyboardController?.hide()
-                    val pickContactIntent = Intent(
-                        Intent.ACTION_PICK,
-                        ContactsContract.CommonDataKinds.Phone.CONTENT_URI
-                    )
-                    runCatching {
-                        contactPickerLauncher.launch(pickContactIntent)
-                    }.onFailure { throwable ->
-                        Log.e(TAG, "Failed to open contact picker", throwable)
-                        Toast.makeText(context, "Rehber acilamadi", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                modifier = Modifier
-                    .size(56.dp),
-                shape = RoundedCornerShape(
-                    topStart = 0.dp,
-                    bottomStart = 0.dp,
-                    topEnd = 16.dp,
-                    bottomEnd = 16.dp
-                ),
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = "Rehberden sec",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-        }
-
-        OutlinedTextField(
-            value = draftMessage,
-            onValueChange = { draftMessage = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(top = 10.dp),
-            label = { Text(text = "Mesaj") },
-            placeholder = { Text(text = "Mesajinizi yazin") },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = KeyboardActions(
-                onSend = {
-                    submitMessage()
-                    keyboardController?.hide()
-                }
-            )
-        )
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            horizontalArrangement = Arrangement.End
-        ) {
-            Button(
-                onClick = {
-                    submitMessage()
-                    keyboardController?.hide()
-                },
-                enabled = destinationAddress.isNotBlank() && draftMessage.isNotBlank()
-            ) {
-                Text(text = "Gonder")
-            }
-        }
-    }
-}
-
-private fun Modifier.swipeBackGesture(onBack: () -> Unit): Modifier = composed {
+internal fun Modifier.swipeBackGesture(onBack: () -> Unit): Modifier = composed {
     val swipeBackThresholdPx = with(LocalDensity.current) { SWIPE_BACK_THRESHOLD_DP.toPx() }
     pointerInput(onBack, swipeBackThresholdPx) {
         var draggedDistance = 0f
@@ -1406,205 +755,4 @@ private fun Modifier.swipeBackGesture(onBack: () -> Unit): Modifier = composed {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun DetailMessageBubble(
-    sms: SmsEntity,
-    onClick: () -> Unit = {},
-    onLongPress: () -> Unit
-) {
-    val isOutgoing = sms.reason == SENT_MESSAGE_REASON
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isOutgoing) Arrangement.End else Arrangement.Start
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .clip(MaterialTheme.shapes.medium)
-                .background(
-                    if (isOutgoing) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    }
-                )
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = onLongPress
-                )
-                .padding(horizontal = 10.dp, vertical = 8.dp)
-        ) {
-            Text(
-                text = sms.body.ifBlank { "(Bos mesaj)" },
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun MessageBubble(
-    sms: SmsEntity,
-    showReason: Boolean,
-    onClick: () -> Unit = {},
-    onLongPress: () -> Unit
-) {
-    val bodyMaxLines = if (showReason) 1 else 2
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(MESSAGE_BUBBLE_HEIGHT)
-            .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongPress
-            )
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(0.dp)
-    ) {
-        Text(
-            text = sms.body.ifBlank { "(Bos mesaj)" },
-            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 14.sp),
-            minLines = bodyMaxLines,
-            maxLines = bodyMaxLines,
-            overflow = TextOverflow.Ellipsis
-        )
-        if (showReason) {
-            Text(
-                text = "Reason: ${sms.reason}",
-                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 14.sp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-private fun SwipeActionButton(
-    iconRes: Int,
-    contentDescription: String,
-    onClick: () -> Unit
-) {
-    IconButton(
-        modifier = Modifier.size(44.dp),
-        onClick = onClick
-    ) {
-        Icon(
-            painter = painterResource(id = iconRes),
-            contentDescription = contentDescription
-        )
-    }
-}
-
-private fun sendSmsMessage(
-    context: Context,
-    destinationAddress: String,
-    messageBody: String
-): Boolean {
-    if (destinationAddress.isBlank() || messageBody.isBlank()) {
-        return false
-    }
-
-    val hasPermission = ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.SEND_SMS
-    ) == PackageManager.PERMISSION_GRANTED
-    if (!hasPermission) {
-        return false
-    }
-
-    val smsManager = context.getSystemService(SmsManager::class.java) ?: return false
-
-    return runCatching {
-        smsManager.sendTextMessage(
-            destinationAddress,
-            null,
-            messageBody,
-            null,
-            null
-        )
-    }.isSuccess
-}
-
-private suspend fun readPhoneNumberFromPickerUri(
-    context: Context,
-    contactUri: Uri
-): String? {
-    return withContext(Dispatchers.IO) {
-        runCatching {
-            context.contentResolver.query(
-                contactUri,
-                arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
-                null,
-                null,
-                null
-            )?.use { cursor ->
-                val numberIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
-                if (numberIndex == -1 || !cursor.moveToFirst()) {
-                    null
-                } else {
-                    cursor.getString(numberIndex)?.trim()
-                }
-            }
-        }.onFailure { throwable ->
-            Log.e(TAG, "Failed to read selected contact", throwable)
-        }.getOrNull()
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun ConversationListItemPreview() {
-    SmsFirewallTheme {
-        ConversationListItem(
-            conversation = SmsConversation(
-                senderKey = "5551112233",
-                displaySender = "+905551112233",
-                messages = listOf(
-                    SmsEntity(
-                        id = 1,
-                        sender = "+905551112233",
-                        body = "Ilk mesaj",
-                        receivedAt = 1_700_000_000_000,
-                        status = SmsStatus.BLOCK,
-                        reason = "Blocked keyword"
-                    ),
-                    SmsEntity(
-                        id = 2,
-                        sender = "+905551112233",
-                        body = "Ikinci mesaj",
-                        receivedAt = 1_700_000_100_000,
-                        status = SmsStatus.BLOCK,
-                        reason = "Blocked sender"
-                    )
-                ),
-                latestReceivedAt = 1_700_000_100_000
-            ),
-            isNotificationsMuted = false,
-            showReason = true,
-            onOpenConversation = {},
-            isActionsVisible = false,
-            onShowActions = {},
-            onHideActions = {},
-            onMessageLongPress = {},
-            onSwipeDeleteConversation = {},
-            onMuteNotifications = {},
-            onUnmuteNotifications = {}
-        )
-    }
-}
-
-private const val PHONE_COMPARE_LENGTH = 10
-private const val SENT_MESSAGE_REASON = "Sent by user"
-private const val SYSTEM_PROVIDER_REASON = "From system provider"
-private const val MESSAGE_TYPE_INBOX = 1
-private const val MESSAGE_TYPE_SENT = 2
-private const val TAG = "BlockedSmsScreen"
 private val SWIPE_BACK_THRESHOLD_DP = 96.dp
-private val CONVERSATION_CARD_HEIGHT = 116.dp
-private val MESSAGE_BUBBLE_HEIGHT = 46.dp
