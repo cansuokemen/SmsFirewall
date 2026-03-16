@@ -357,7 +357,16 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                                         isRefreshing = false
                                     }
                                 },
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clickable(
+                                        indication = null,
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                                    ) {
+                                        if (actionRevealedConversationKey != null) {
+                                            actionRevealedConversationKey = null
+                                        }
+                                    }
                             ) {
                                 if (filteredConversations.isEmpty()) {
                                     if (conversationSearchQuery.isNotBlank()) {
@@ -695,7 +704,13 @@ private fun ConversationListItem(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onOpenConversation),
+                    .clickable(onClick = {
+                        if (isActionsVisible) {
+                            onHideActions()
+                        } else {
+                            onOpenConversation()
+                        }
+                    }),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
@@ -725,25 +740,51 @@ private fun ConversationListItem(
                     Column(modifier = Modifier.weight(1f)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.Top
                         ) {
-                            Text(
-                                text = displayName,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.SemiBold,
-                                color = if (hasUnread) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            // Sol taraf: isim + mesaj önizleme
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = displayName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                val latestMessage = conversation.messages.lastOrNull()
+                                if (latestMessage != null) {
+                                    Text(
+                                        text = latestMessage.body.ifBlank { "(Bos mesaj)" },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (hasUnread) {
+                                            MaterialTheme.colorScheme.onSurface
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        fontWeight = if (hasUnread) FontWeight.Medium else FontWeight.Normal,
+                                        maxLines = if (showReason) 1 else 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(top = 2.dp)
+                                    )
+                                    if (showReason) {
+                                        Text(
+                                            text = "Neden: ${latestMessage.reason}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(top = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Sağ taraf: tarih + okunmamış badge (dikey hizalı)
+                            Column(
+                                horizontalAlignment = Alignment.End,
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(start = 8.dp)
                             ) {
                                 Text(
                                     text = formatConversationTimestamp(conversation.latestReceivedAt),
@@ -773,33 +814,6 @@ private fun ConversationListItem(
                                 }
                             }
                         }
-
-                        val latestMessage = conversation.messages.lastOrNull()
-                        if (latestMessage != null) {
-                            Text(
-                                text = latestMessage.body.ifBlank { "(Bos mesaj)" },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (hasUnread) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                fontWeight = if (hasUnread) FontWeight.Medium else FontWeight.Normal,
-                                maxLines = if (showReason) 1 else 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                            if (showReason) {
-                                Text(
-                                    text = "Neden: ${latestMessage.reason}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
-                        }
                     }
                 }
             }
@@ -807,8 +821,12 @@ private fun ConversationListItem(
             if (isActionsVisible) {
                 Row(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 8.dp, end = 8.dp),
+                        .align(Alignment.CenterEnd)
+                        .background(
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                            RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (isNotificationsMuted) {
