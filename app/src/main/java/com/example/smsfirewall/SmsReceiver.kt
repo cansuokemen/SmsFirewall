@@ -19,6 +19,7 @@ import com.example.smsfirewall.data.DatabaseProvider
 import com.example.smsfirewall.data.SpamRetentionPolicy
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.local.SmsEntity
+import com.example.smsfirewall.filter.FilterKeywordStore
 import com.example.smsfirewall.filter.SmsFilterEngine
 import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.notifications.MutedSenderStore
@@ -44,8 +45,10 @@ class SmsReceiver : BroadcastReceiver() {
         }
         val receivedAt = messages.firstOrNull()?.timestampMillis ?: System.currentTimeMillis()
 
+        val filterStore = FilterKeywordStore(context)
         val filterEngine = SmsFilterEngine(
-            blockedKeywords = setOf("free", "winner", "loan", "debt", "credit")
+            blockedSenders = filterStore.getBlockedSenders(),
+            blockedKeywords = filterStore.getBlockedKeywords()
         )
         val decision = filterEngine.evaluate(sender = sender, body = body)
 
@@ -122,7 +125,7 @@ class SmsReceiver : BroadcastReceiver() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 NotificationConstants.ALLOWED_SMS_CHANNEL_ID,
-                "Allowed SMS",
+                context.getString(R.string.notification_channel_name),
                 NotificationManager.IMPORTANCE_DEFAULT
             )
             manager.createNotificationChannel(channel)
@@ -140,8 +143,8 @@ class SmsReceiver : BroadcastReceiver() {
 
         val notification = NotificationCompat.Builder(context, NotificationConstants.ALLOWED_SMS_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_email)
-            .setContentTitle(sender.ifBlank { "Unknown sender" })
-            .setContentText(body.ifBlank { "New SMS received" })
+            .setContentTitle(sender.ifBlank { context.getString(R.string.notification_unknown_sender) })
+            .setContentText(body.ifBlank { context.getString(R.string.notification_new_sms) })
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)

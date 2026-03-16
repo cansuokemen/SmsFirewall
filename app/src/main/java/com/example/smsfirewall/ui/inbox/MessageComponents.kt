@@ -24,8 +24,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.smsfirewall.R
 import com.example.smsfirewall.data.local.SmsEntity
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -58,7 +60,7 @@ internal fun DetailMessageBubble(
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             Text(
-                text = sms.body.ifBlank { "(Boş mesaj)" },
+                text = sms.body.ifBlank { stringResource(R.string.empty_message_placeholder) },
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (isOutgoing) {
                     MaterialTheme.colorScheme.onPrimaryContainer
@@ -103,7 +105,7 @@ internal fun MessageBubble(
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         Text(
-            text = sms.body.ifBlank { "(Boş mesaj)" },
+            text = sms.body.ifBlank { stringResource(R.string.empty_message_placeholder) },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             minLines = bodyMaxLines,
@@ -112,7 +114,7 @@ internal fun MessageBubble(
         )
         if (showReason) {
             Text(
-                text = "Neden: ${sms.reason}",
+                text = stringResource(R.string.reason_prefix, sms.reason),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 maxLines = 1,
@@ -141,7 +143,7 @@ internal fun SpamMessageActionRow(
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             )
         ) {
-            Text(text = "Spam değil", style = MaterialTheme.typography.labelLarge)
+            Text(text = stringResource(R.string.not_spam), style = MaterialTheme.typography.labelLarge)
         }
         Button(
             onClick = onDelete,
@@ -151,7 +153,7 @@ internal fun SpamMessageActionRow(
                 contentColor = MaterialTheme.colorScheme.onErrorContainer
             )
         ) {
-            Text(text = "Sil", style = MaterialTheme.typography.labelLarge)
+            Text(text = stringResource(R.string.delete), style = MaterialTheme.typography.labelLarge)
         }
     }
 }

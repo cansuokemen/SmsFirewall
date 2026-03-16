@@ -66,7 +66,7 @@ internal fun SpamAutoDeleteWarningCard() {
         ) {
             Icon(
                 imageVector = Icons.Outlined.Warning,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.cd_warning),
                 tint = MaterialTheme.colorScheme.onErrorContainer
             )
             Spacer(modifier = Modifier.width(12.dp))

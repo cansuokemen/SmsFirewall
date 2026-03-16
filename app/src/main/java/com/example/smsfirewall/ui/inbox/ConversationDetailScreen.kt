@@ -51,8 +51,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.smsfirewall.R
 import com.example.smsfirewall.data.local.SmsEntity
 import java.util.Calendar
 
@@ -136,7 +138,7 @@ internal fun ConversationDetailScreen(
                 IconButton(onClick = handleBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Geri"
+                        contentDescription = stringResource(R.string.cd_back)
                     )
                 }
             },
@@ -248,7 +250,7 @@ internal fun ConversationDetailScreen(
                     ),
                     placeholder = {
                         Text(
-                            text = "Mesaj yaz",
+                            text = stringResource(R.string.message_input_placeholder),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -268,7 +270,7 @@ internal fun ConversationDetailScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Gönder"
+                        contentDescription = stringResource(R.string.cd_send)
                     )
                 }
             }

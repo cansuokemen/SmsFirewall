@@ -49,9 +49,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.smsfirewall.R
 import kotlinx.coroutines.launch
 
 private const val TAG = "NewMessageScreen"
@@ -77,7 +79,7 @@ internal fun NewMessageScreen(
 
         val contactUri = result.data?.data
         if (contactUri == null) {
-            Toast.makeText(context, "Kişi seçilemedi", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.contact_pick_failed), Toast.LENGTH_SHORT).show()
             return@rememberLauncherForActivityResult
         }
 
@@ -87,7 +89,7 @@ internal fun NewMessageScreen(
                 contactUri = contactUri
             )
             if (selectedNumber.isNullOrBlank()) {
-                Toast.makeText(context, "Numara bulunamadı", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.number_not_found), Toast.LENGTH_SHORT).show()
             } else {
                 destinationAddress = selectedNumber
             }
@@ -99,11 +101,11 @@ internal fun NewMessageScreen(
         val messageBody = draftMessage.trim()
 
         if (recipient.isBlank()) {
-            Toast.makeText(context, "Numara girin", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.enter_number), Toast.LENGTH_SHORT).show()
             return
         }
         if (messageBody.isBlank()) {
-            Toast.makeText(context, "Mesaj boş olamaz", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.message_empty), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -133,7 +135,7 @@ internal fun NewMessageScreen(
         TopAppBar(
             title = {
                 Text(
-                    text = "Yeni Mesaj",
+                    text = stringResource(R.string.new_message),
                     style = MaterialTheme.typography.titleMedium
                 )
             },
@@ -141,7 +143,7 @@ internal fun NewMessageScreen(
                 IconButton(onClick = handleBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Geri"
+                        contentDescription = stringResource(R.string.cd_back)
                     )
                 }
             },
@@ -163,7 +165,7 @@ internal fun NewMessageScreen(
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
-                label = { Text(text = "Numara") },
+                label = { Text(text = stringResource(R.string.phone_number)) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outline
@@ -185,7 +187,7 @@ internal fun NewMessageScreen(
                         contactPickerLauncher.launch(pickContactIntent)
                     }.onFailure { throwable ->
                         Log.e(TAG, "Failed to open contact picker", throwable)
-                        Toast.makeText(context, "Rehber açılamadı", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.contacts_open_failed), Toast.LENGTH_SHORT).show()
                     }
                 },
                 modifier = Modifier.size(56.dp),
@@ -195,7 +197,7 @@ internal fun NewMessageScreen(
             ) {
                 Icon(
                     imageVector = Icons.Outlined.PersonAdd,
-                    contentDescription = "Rehberden seç"
+                    contentDescription = stringResource(R.string.cd_pick_contact)
                 )
             }
         }
@@ -208,8 +210,8 @@ internal fun NewMessageScreen(
                 .weight(1f)
                 .padding(horizontal = 12.dp, vertical = 12.dp),
             shape = RoundedCornerShape(16.dp),
-            label = { Text(text = "Mesaj") },
-            placeholder = { Text(text = "Mesajınızı yazın") },
+            label = { Text(text = stringResource(R.string.message_label)) },
+            placeholder = { Text(text = stringResource(R.string.message_placeholder)) },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outline
@@ -244,7 +246,7 @@ internal fun NewMessageScreen(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Gönder"
+                    contentDescription = stringResource(R.string.cd_send)
                 )
             }
         }

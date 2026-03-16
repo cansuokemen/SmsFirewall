@@ -68,4 +68,31 @@
     <string name="today">Bugün</string>
     <string name="yesterday">Dün</string>
     <string name="unknown_sender">Bilinmeyen gönderici</string>
+
+    <!-- Conversation detail -->
+    <string name="message_input_placeholder">Mesaj yaz</string>
+
+    <!-- Accessibility -->
+    <string name="cd_back">Geri</string>
+    <string name="cd_send">Gönder</string>
+    <string name="cd_new_message">Yeni mesaj</string>
+    <string name="cd_pick_contact">Rehberden seç</string>
+    <string name="cd_delete">Sil</string>
+    <string name="cd_delete_conversation">Konuşmayı sil</string>
+    <string name="cd_mute_notifications">Bildirimleri kapat</string>
+    <string name="cd_unmute_notifications">Bildirimi yeniden aç</string>
+    <string name="cd_search">Ara</string>
+    <string name="cd_warning">Uyarı</string>
+    <string name="cd_empty_state">Boş durum ikonu</string>
+    <string name="cd_copy_message">Mesajı kopyala</string>
+    <string name="cd_delete_message">Mesajı sil</string>
+
+    <!-- Notifications -->
+    <string name="notification_channel_name">SMS Bildirimleri</string>
+    <string name="notification_unknown_sender">Bilinmeyen gönderici</string>
+    <string name="notification_new_sms">Yeni SMS alındı</string>
+
+    <!-- Filter settings -->
+    <string name="filter_prefs_name">sms_filter_settings</string>
+    <string name="filter_keywords_key">blocked_keywords</string>
 </resources>
