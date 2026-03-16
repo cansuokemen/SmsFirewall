@@ -39,6 +39,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Notifications
@@ -527,27 +528,72 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     }
 
     if (selectedForDelete != null) {
+        val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         AlertDialog(
             onDismissRequest = { selectedForDelete = null },
-            title = { Text(text = "Mesaji sil") },
-            text = { Text(text = "Secili mesaj silinsin mi?") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val sms = selectedForDelete ?: return@TextButton
-                        scope.launch {
-                            if (selectedTab == InboxTab.MESSAGES) {
-                                deleteSmsFromSystemProvider(context, sms.id)
-                            } else {
-                                repository.delete(sms)
-                            }
+            title = { Text(text = "Mesaj secenekleri") },
+            text = {
+                Column {
+                    TextButton(
+                        onClick = {
+                            val sms = selectedForDelete ?: return@TextButton
+                            clipboardManager.setPrimaryClip(
+                                android.content.ClipData.newPlainText("SMS", sms.body)
+                            )
+                            Toast.makeText(context, "Mesaj kopyalandi", Toast.LENGTH_SHORT).show()
                             selectedForDelete = null
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Start,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.ContentCopy,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(text = "Mesaji kopyala")
                         }
                     }
-                ) {
-                    Text(text = "Sil", color = MaterialTheme.colorScheme.error)
+                    TextButton(
+                        onClick = {
+                            val sms = selectedForDelete ?: return@TextButton
+                            scope.launch {
+                                if (selectedTab == InboxTab.MESSAGES) {
+                                    deleteSmsFromSystemProvider(context, sms.id)
+                                } else {
+                                    repository.delete(sms)
+                                }
+                                selectedForDelete = null
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Start,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Delete,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Mesaji sil",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                 }
             },
+            confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { selectedForDelete = null }) {
                     Text(text = "Iptal")
