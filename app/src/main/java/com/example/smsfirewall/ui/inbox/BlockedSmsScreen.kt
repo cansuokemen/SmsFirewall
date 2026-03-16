@@ -48,6 +48,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -93,6 +94,7 @@ import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationConstants
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -106,7 +108,9 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val systemResult = rememberSystemMessages(context)
+    var manualRefreshKey by remember { mutableIntStateOf(0) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val systemResult = rememberSystemMessages(context, manualRefreshKey)
     val regularMessages = systemResult.messages
     val unreadIds = systemResult.unreadIds
     val spamMessages by repository.getByStatus(SmsStatus.BLOCK).collectAsState(initial = emptyList())
@@ -322,79 +326,92 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                                 SpamAutoDeleteWarningCard()
                             }
 
-                            if (filteredConversations.isEmpty()) {
-                                if (conversationSearchQuery.isNotBlank()) {
-                                    SearchEmptyState()
-                                } else if (selectedTab == InboxTab.MESSAGES) {
-                                    MessagesEmptyState()
+                            PullToRefreshBox(
+                                isRefreshing = isRefreshing,
+                                onRefresh = {
+                                    isRefreshing = true
+                                    manualRefreshKey++
+                                    scope.launch {
+                                        delay(500)
+                                        isRefreshing = false
+                                    }
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                if (filteredConversations.isEmpty()) {
+                                    if (conversationSearchQuery.isNotBlank()) {
+                                        SearchEmptyState()
+                                    } else if (selectedTab == InboxTab.MESSAGES) {
+                                        MessagesEmptyState()
+                                    } else {
+                                        SpamEmptyState()
+                                    }
                                 } else {
-                                    SpamEmptyState()
-                                }
-                            } else {
-                                LazyColumn(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(top = 8.dp, bottom = 80.dp),
-                                    state = conversationListState,
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    items(filteredConversations, key = { it.senderKey }) { conversation ->
-                                        val isSenderMuted = remember(conversation.senderKey, mutedSendersChangeToken) {
-                                            mutedSenderStore.isMuted(conversation.displaySender)
-                                        }
-                                        val contactName = remember(conversation.displaySender) {
-                                            getContactName(conversation.displaySender)
-                                        }
-                                        ConversationListItem(
-                                            conversation = conversation,
-                                            contactName = contactName,
-                                            isNotificationsMuted = isSenderMuted,
-                                            showReason = selectedTab == InboxTab.SPAM,
-                                            onOpenConversation = {
-                                                isNewMessageScreenOpen = false
-                                                actionRevealedConversationKey = null
-                                                openedConversationKey = conversation.senderKey
-                                                if (conversation.unreadCount > 0) {
-                                                    scope.launch {
-                                                        markConversationAsRead(
-                                                            context, conversation, unreadIds
-                                                        )
-                                                    }
-                                                }
-                                            },
-                                            isActionsVisible = actionRevealedConversationKey == conversation.senderKey,
-                                            onShowActions = {
-                                                actionRevealedConversationKey = conversation.senderKey
-                                            },
-                                            onHideActions = {
-                                                if (actionRevealedConversationKey == conversation.senderKey) {
+                                    LazyColumn(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(top = 8.dp, bottom = 80.dp),
+                                        state = conversationListState,
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        items(filteredConversations, key = { it.senderKey }) { conversation ->
+                                            val isSenderMuted = remember(conversation.senderKey, mutedSendersChangeToken) {
+                                                mutedSenderStore.isMuted(conversation.displaySender)
+                                            }
+                                            val contactName = remember(conversation.displaySender) {
+                                                getContactName(conversation.displaySender)
+                                            }
+                                            ConversationListItem(
+                                                conversation = conversation,
+                                                contactName = contactName,
+                                                isNotificationsMuted = isSenderMuted,
+                                                showReason = selectedTab == InboxTab.SPAM,
+                                                onOpenConversation = {
+                                                    isNewMessageScreenOpen = false
                                                     actionRevealedConversationKey = null
-                                                }
-                                            },
-                                            onMessageLongPress = { sms -> selectedForDelete = sms },
-                                            onSwipeDeleteConversation = {
-                                                scope.launch {
-                                                    actionRevealedConversationKey = null
-                                                    conversation.messages.forEach { sms ->
-                                                        if (selectedTab == InboxTab.MESSAGES) {
-                                                            deleteSmsFromSystemProvider(context, sms.id)
-                                                        } else {
-                                                            repository.delete(sms)
+                                                    openedConversationKey = conversation.senderKey
+                                                    if (conversation.unreadCount > 0) {
+                                                        scope.launch {
+                                                            markConversationAsRead(
+                                                                context, conversation, unreadIds
+                                                            )
                                                         }
                                                     }
+                                                },
+                                                isActionsVisible = actionRevealedConversationKey == conversation.senderKey,
+                                                onShowActions = {
+                                                    actionRevealedConversationKey = conversation.senderKey
+                                                },
+                                                onHideActions = {
+                                                    if (actionRevealedConversationKey == conversation.senderKey) {
+                                                        actionRevealedConversationKey = null
+                                                    }
+                                                },
+                                                onMessageLongPress = { sms -> selectedForDelete = sms },
+                                                onSwipeDeleteConversation = {
+                                                    scope.launch {
+                                                        actionRevealedConversationKey = null
+                                                        conversation.messages.forEach { sms ->
+                                                            if (selectedTab == InboxTab.MESSAGES) {
+                                                                deleteSmsFromSystemProvider(context, sms.id)
+                                                            } else {
+                                                                repository.delete(sms)
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                onMuteNotifications = {
+                                                    mutedSenderStore.mute(conversation.displaySender)
+                                                    mutedSendersChangeToken++
+                                                    Toast.makeText(context, "Bildirim kapatildi", Toast.LENGTH_SHORT).show()
+                                                },
+                                                onUnmuteNotifications = {
+                                                    mutedSenderStore.unmute(conversation.displaySender)
+                                                    mutedSendersChangeToken++
+                                                    Toast.makeText(context, "Bildirim acildi", Toast.LENGTH_SHORT).show()
                                                 }
-                                            },
-                                            onMuteNotifications = {
-                                                mutedSenderStore.mute(conversation.displaySender)
-                                                mutedSendersChangeToken++
-                                                Toast.makeText(context, "Bildirim kapatildi", Toast.LENGTH_SHORT).show()
-                                            },
-                                            onUnmuteNotifications = {
-                                                mutedSenderStore.unmute(conversation.displaySender)
-                                                mutedSendersChangeToken++
-                                                Toast.makeText(context, "Bildirim acildi", Toast.LENGTH_SHORT).show()
-                                            }
-                                        )
+                                            )
+                                        }
                                     }
                                 }
                             }

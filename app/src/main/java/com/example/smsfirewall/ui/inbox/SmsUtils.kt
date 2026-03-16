@@ -58,7 +58,10 @@ internal data class SystemMessagesResult(
 )
 
 @Composable
-internal fun rememberSystemMessages(context: Context): SystemMessagesResult {
+internal fun rememberSystemMessages(
+    context: Context,
+    manualRefreshKey: Int = 0
+): SystemMessagesResult {
     var refreshToken by remember { mutableIntStateOf(0) }
 
     DisposableEffect(context) {
@@ -86,7 +89,8 @@ internal fun rememberSystemMessages(context: Context): SystemMessagesResult {
     val result by produceState(
         initialValue = SystemMessagesResult(emptyList(), emptySet()),
         context,
-        refreshToken
+        refreshToken,
+        manualRefreshKey
     ) {
         value = withContext(Dispatchers.IO) {
             querySystemMessagesWithReadStatus(context)
