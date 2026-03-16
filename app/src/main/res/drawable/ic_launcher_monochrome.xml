@@ -4,35 +4,29 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Shield outer shape - bright blue -->
+    <!-- Shield outline -->
     <path
-        android:fillColor="#3B5BDB"
+        android:fillColor="#000000"
         android:pathData="M54,18 L80,28 C80,28 82,56 78,66 C74,76 54,90 54,90 C54,90 34,76 30,66 C26,56 28,28 28,28 Z" />
 
-    <!-- Shield inner shape - dark navy -->
+    <!-- Shield inner cutout -->
     <path
-        android:fillColor="#1E2A5E"
+        android:fillColor="#FFFFFF"
         android:pathData="M54,24 L75,32.5 C75,32.5 77,56 73.5,64.5 C70,73 54,84.5 54,84.5 C54,84.5 38,73 34.5,64.5 C31,56 33,32.5 33,32.5 Z" />
-
-    <!-- Shield highlight line - medium blue -->
-    <path
-        android:fillColor="#4C6EF5"
-        android:strokeWidth="0"
-        android:pathData="M54,18 L80,28 C80,28 80.5,32 80.5,36 L54,27 L28.5,36 C28.5,32 28,28 28,28 Z" />
 
     <!-- Message bubble body -->
     <path
-        android:fillColor="#FFFFFF"
+        android:fillColor="#000000"
         android:pathData="M42,46 L66,46 C68.2,46 70,47.8 70,50 L70,60 C70,62.2 68.2,64 66,64 L50,64 L44,70 L44,64 L42,64 C39.8,64 38,62.2 38,60 L38,50 C38,47.8 39.8,46 42,46 Z" />
 
-    <!-- Three dots in message bubble -->
+    <!-- Three dots -->
     <path
-        android:fillColor="#1E2A5E"
+        android:fillColor="#FFFFFF"
         android:pathData="M47,55 A2,2 0 1,0 47,54.99 Z" />
     <path
-        android:fillColor="#1E2A5E"
+        android:fillColor="#FFFFFF"
         android:pathData="M54,55 A2,2 0 1,0 54,54.99 Z" />
     <path
-        android:fillColor="#1E2A5E"
+        android:fillColor="#FFFFFF"
         android:pathData="M61,55 A2,2 0 1,0 61,54.99 Z" />
 </vector>
