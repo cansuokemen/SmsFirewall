@@ -30,4 +30,8 @@ class SmsRepository(
     suspend fun delete(sms: SmsEntity) {
         smsDao.delete(sms)
     }
+
+    suspend fun deleteAll(messages: List<SmsEntity>) {
+        smsDao.deleteAll(messages)
+    }
 }

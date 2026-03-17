@@ -98,6 +98,11 @@ import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationConstants
 import com.example.smsfirewall.ui.theme.ThemeMode
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.SelectAll
+import androidx.compose.material.icons.outlined.Deselect
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.IconButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -158,6 +163,11 @@ fun BlockedSmsScreen(
     var conversationSearchInput by remember { mutableStateOf("") }
     var conversationSearchQuery by remember { mutableStateOf("") }
     val shouldShowNotificationWarning = shouldShowNotificationPopupWarning(context)
+
+    // Batch selection state
+    var isSelectionMode by remember { mutableStateOf(false) }
+    val selectedConversationKeys = remember { mutableStateOf(setOf<String>()) }
+    var showBatchDeleteConfirm by remember { mutableStateOf(false) }
 
     // Contact name cache (async - IO thread'de resolve edilir)
     val contactNameCache = remember { mutableStateMapOf<String, String?>() }
@@ -235,6 +245,9 @@ fun BlockedSmsScreen(
     }
 
     LaunchedEffect(selectedTab) {
+        // Clear selection when switching tabs
+        isSelectionMode = false
+        selectedConversationKeys.value = emptySet()
         if (selectedTab == InboxTab.SPAM) {
             conversationListState.scrollToItem(0)
             repository.deleteByStatusBefore(
@@ -351,23 +364,82 @@ fun BlockedSmsScreen(
                 ScreenState.LIST -> {
                     Box(modifier = Modifier.fillMaxSize()) {
                         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = 4.dp, top = 8.dp, end = 0.dp, bottom = 0.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.app_name),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                IconButton(onClick = { isSettingsOpen = true }) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Settings,
-                                        contentDescription = stringResource(R.string.cd_settings)
+                            if (isSelectionMode) {
+                                // Selection mode header
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 4.dp, top = 8.dp, end = 0.dp, bottom = 0.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    IconButton(onClick = {
+                                        isSelectionMode = false
+                                        selectedConversationKeys.value = emptySet()
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Close,
+                                            contentDescription = stringResource(R.string.cd_close_selection)
+                                        )
+                                    }
+                                    Text(
+                                        text = stringResource(R.string.selected_count, selectedConversationKeys.value.size),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.weight(1f)
                                     )
+                                    // Select all / Deselect all
+                                    val allSelected = filteredConversations.isNotEmpty() &&
+                                        selectedConversationKeys.value.size == filteredConversations.size
+                                    IconButton(onClick = {
+                                        selectedConversationKeys.value = if (allSelected) {
+                                            emptySet()
+                                        } else {
+                                            filteredConversations.map { it.senderKey }.toSet()
+                                        }
+                                    }) {
+                                        Icon(
+                                            imageVector = if (allSelected) Icons.Outlined.Deselect else Icons.Outlined.SelectAll,
+                                            contentDescription = stringResource(
+                                                if (allSelected) R.string.deselect_all else R.string.select_all
+                                            )
+                                        )
+                                    }
+                                    // Delete selected
+                                    IconButton(
+                                        onClick = { showBatchDeleteConfirm = true },
+                                        enabled = selectedConversationKeys.value.isNotEmpty()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Delete,
+                                            contentDescription = stringResource(R.string.delete_selected),
+                                            tint = if (selectedConversationKeys.value.isNotEmpty()) {
+                                                MaterialTheme.colorScheme.error
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                                            }
+                                        )
+                                    }
+                                }
+                            } else {
+                                // Normal header
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 4.dp, top = 8.dp, end = 0.dp, bottom = 0.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.app_name),
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(onClick = { isSettingsOpen = true }) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Settings,
+                                            contentDescription = stringResource(R.string.cd_settings)
+                                        )
+                                    }
                                 }
                             }
 
@@ -441,27 +513,64 @@ fun BlockedSmsScreen(
                                             val contactName = remember(conversation.displaySender) {
                                                 getContactName(conversation.displaySender)
                                             }
+                                            val isSelected = conversation.senderKey in selectedConversationKeys.value
                                             ConversationListItem(
                                                 modifier = Modifier.animateItem(),
                                                 conversation = conversation,
                                                 contactName = contactName,
                                                 isNotificationsMuted = isSenderMuted,
                                                 showReason = selectedTab == InboxTab.SPAM,
+                                                isSelectionMode = isSelectionMode,
+                                                isSelected = isSelected,
+                                                onToggleSelection = {
+                                                    val current = selectedConversationKeys.value
+                                                    selectedConversationKeys.value = if (isSelected) {
+                                                        current - conversation.senderKey
+                                                    } else {
+                                                        current + conversation.senderKey
+                                                    }
+                                                    // Exit selection mode if nothing selected
+                                                    if (selectedConversationKeys.value.isEmpty()) {
+                                                        isSelectionMode = false
+                                                    }
+                                                },
+                                                onLongClick = {
+                                                    if (!isSelectionMode) {
+                                                        isSelectionMode = true
+                                                        selectedConversationKeys.value = setOf(conversation.senderKey)
+                                                        actionRevealedConversationKey = null
+                                                    }
+                                                },
                                                 onOpenConversation = {
-                                                    isNewMessageScreenOpen = false
-                                                    actionRevealedConversationKey = null
-                                                    openedConversationKey = conversation.senderKey
-                                                    if (conversation.unreadCount > 0) {
-                                                        scope.launch {
-                                                            markConversationAsRead(
-                                                                context, conversation, unreadIds
-                                                            )
+                                                    if (isSelectionMode) {
+                                                        // In selection mode, tap toggles selection
+                                                        val current = selectedConversationKeys.value
+                                                        selectedConversationKeys.value = if (isSelected) {
+                                                            current - conversation.senderKey
+                                                        } else {
+                                                            current + conversation.senderKey
+                                                        }
+                                                        if (selectedConversationKeys.value.isEmpty()) {
+                                                            isSelectionMode = false
+                                                        }
+                                                    } else {
+                                                        isNewMessageScreenOpen = false
+                                                        actionRevealedConversationKey = null
+                                                        openedConversationKey = conversation.senderKey
+                                                        if (conversation.unreadCount > 0) {
+                                                            scope.launch {
+                                                                markConversationAsRead(
+                                                                    context, conversation, unreadIds
+                                                                )
+                                                            }
                                                         }
                                                     }
                                                 },
-                                                isActionsVisible = actionRevealedConversationKey == conversation.senderKey,
+                                                isActionsVisible = actionRevealedConversationKey == conversation.senderKey && !isSelectionMode,
                                                 onShowActions = {
-                                                    actionRevealedConversationKey = conversation.senderKey
+                                                    if (!isSelectionMode) {
+                                                        actionRevealedConversationKey = conversation.senderKey
+                                                    }
                                                 },
                                                 onHideActions = {
                                                     if (actionRevealedConversationKey == conversation.senderKey) {
@@ -500,7 +609,7 @@ fun BlockedSmsScreen(
 
                         // Bottom bar with search and FAB
                         AnimatedVisibility(
-                            visible = isBottomBarVisible,
+                            visible = isBottomBarVisible && !isSelectionMode,
                             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
                             modifier = Modifier.align(Alignment.BottomCenter)
@@ -673,6 +782,45 @@ fun BlockedSmsScreen(
             }
         )
     }
+
+    if (showBatchDeleteConfirm) {
+        val count = selectedConversationKeys.value.size
+        AlertDialog(
+            onDismissRequest = { showBatchDeleteConfirm = false },
+            title = { Text(text = stringResource(R.string.delete_selected)) },
+            text = { Text(text = stringResource(R.string.delete_selected_confirm, count)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showBatchDeleteConfirm = false
+                    val keysToDelete = selectedConversationKeys.value.toSet()
+                    scope.launch {
+                        val conversationsToDelete = filteredConversations.filter { it.senderKey in keysToDelete }
+                        for (conv in conversationsToDelete) {
+                            for (sms in conv.messages) {
+                                if (selectedTab == InboxTab.MESSAGES) {
+                                    deleteSmsFromSystemProvider(context, sms.id)
+                                } else {
+                                    repository.delete(sms)
+                                }
+                            }
+                        }
+                        isSelectionMode = false
+                        selectedConversationKeys.value = emptySet()
+                    }
+                }) {
+                    Text(
+                        text = stringResource(R.string.delete),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBatchDeleteConfirm = false }) {
+                    Text(text = stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -683,6 +831,10 @@ private fun ConversationListItem(
     contactName: String?,
     isNotificationsMuted: Boolean,
     showReason: Boolean,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onToggleSelection: () -> Unit = {},
+    onLongClick: () -> Unit = {},
     onOpenConversation: () -> Unit,
     isActionsVisible: Boolean,
     onShowActions: () -> Unit,
@@ -729,8 +881,8 @@ private fun ConversationListItem(
     SwipeToDismissBox(
         modifier = modifier,
         state = dismissState,
-        enableDismissFromStartToEnd = true,
-        enableDismissFromEndToStart = true,
+        enableDismissFromStartToEnd = !isSelectionMode,
+        enableDismissFromEndToStart = !isSelectionMode,
         backgroundContent = {
             val direction = dismissState.dismissDirection
             if (direction == SwipeToDismissBoxValue.EndToStart) {
@@ -755,16 +907,23 @@ private fun ConversationListItem(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = {
-                        if (isActionsVisible) {
-                            onHideActions()
-                        } else {
-                            onOpenConversation()
-                        }
-                    }),
+                    .combinedClickable(
+                        onClick = {
+                            if (isActionsVisible) {
+                                onHideActions()
+                            } else {
+                                onOpenConversation()
+                            }
+                        },
+                        onLongClick = onLongClick
+                    ),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = if (isSelected) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    }
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
@@ -773,6 +932,14 @@ private fun ConversationListItem(
                     verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // Checkbox for selection mode
+                    if (isSelectionMode) {
+                        Checkbox(
+                            checked = isSelected,
+                            onCheckedChange = { onToggleSelection() },
+                            modifier = Modifier.padding(end = 0.dp)
+                        )
+                    }
                     // Avatar
                     Box(
                         modifier = Modifier

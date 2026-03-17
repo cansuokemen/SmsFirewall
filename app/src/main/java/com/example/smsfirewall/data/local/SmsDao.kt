@@ -26,4 +26,7 @@ interface SmsDao {
 
     @Delete
     suspend fun delete(sms: SmsEntity)
+
+    @Delete
+    suspend fun deleteAll(messages: List<SmsEntity>)
 }
