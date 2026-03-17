@@ -41,7 +41,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material3.AlertDialog
@@ -97,18 +96,26 @@ import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationConstants
+import com.example.smsfirewall.ui.theme.ThemeMode
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.IconButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private enum class ScreenState {
-    LIST, DETAIL, NEW_MESSAGE
+    LIST, DETAIL, NEW_MESSAGE, SETTINGS
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
+fun BlockedSmsScreen(
+    repository: SmsRepository,
+    currentThemeMode: ThemeMode,
+    onThemeModeChanged: (ThemeMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -146,6 +153,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     var selectedTab by remember { mutableStateOf(InboxTab.MESSAGES) }
     var openedConversationKey by remember { mutableStateOf<String?>(null) }
     var isNewMessageScreenOpen by remember { mutableStateOf(false) }
+    var isSettingsOpen by remember { mutableStateOf(false) }
     var actionRevealedConversationKey by remember { mutableStateOf<String?>(null) }
     var conversationSearchInput by remember { mutableStateOf("") }
     var conversationSearchQuery by remember { mutableStateOf("") }
@@ -188,8 +196,9 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
         spamMessages
     }
     val currentUnreadIds = if (selectedTab == InboxTab.MESSAGES) unreadIds else emptySet()
-    val visibleConversations = remember(visibleMessages, currentUnreadIds) {
-        buildConversations(visibleMessages, currentUnreadIds)
+    val unknownSenderLabel = stringResource(R.string.unknown_sender)
+    val visibleConversations = remember(visibleMessages, currentUnreadIds, unknownSenderLabel) {
+        buildConversations(visibleMessages, currentUnreadIds, unknownSenderLabel)
     }
     val filteredConversations = remember(visibleConversations, conversationSearchQuery) {
         val query = conversationSearchQuery.trim()
@@ -206,6 +215,7 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
     }
 
     val currentScreen = when {
+        isSettingsOpen -> ScreenState.SETTINGS
         openedConversation != null -> ScreenState.DETAIL
         isNewMessageScreenOpen -> ScreenState.NEW_MESSAGE
         else -> ScreenState.LIST
@@ -329,9 +339,38 @@ fun BlockedSmsScreen(repository: SmsRepository, modifier: Modifier = Modifier) {
                     )
                 }
 
+                ScreenState.SETTINGS -> {
+                    SettingsScreen(
+                        currentThemeMode = currentThemeMode,
+                        onThemeModeChanged = onThemeModeChanged,
+                        onBack = { isSettingsOpen = false },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
                 ScreenState.LIST -> {
                     Box(modifier = Modifier.fillMaxSize()) {
                         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 4.dp, top = 8.dp, end = 0.dp, bottom = 0.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.app_name),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(onClick = { isSettingsOpen = true }) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Settings,
+                                        contentDescription = stringResource(R.string.cd_settings)
+                                    )
+                                }
+                            }
+
                             if (shouldShowNotificationWarning) {
                                 NotificationWarningCard(onOpenSettings = openNotificationSettings)
                             }
@@ -681,6 +720,7 @@ private fun ConversationListItem(
         }
     )
 
+    val context = LocalContext.current
     val displayName = contactName ?: conversation.displaySender
     val avatarLetter = displayName.firstOrNull()?.uppercase() ?: "?"
     val avatarColor = avatarColorForSender(conversation.displaySender)
@@ -798,7 +838,7 @@ private fun ConversationListItem(
                                 modifier = Modifier.padding(start = 8.dp)
                             ) {
                                 Text(
-                                    text = formatConversationTimestamp(conversation.latestReceivedAt),
+                                    text = formatConversationTimestamp(context, conversation.latestReceivedAt),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (hasUnread) {
                                         MaterialTheme.colorScheme.primary

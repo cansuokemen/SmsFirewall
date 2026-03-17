@@ -7,7 +7,6 @@ import com.example.smsfirewall.ui.inbox.normalizeForSearch
 import com.example.smsfirewall.ui.inbox.normalizeSenderForGrouping
 import com.example.smsfirewall.ui.inbox.normalizeDigits
 import com.example.smsfirewall.ui.inbox.numberLikeMatch
-import com.example.smsfirewall.ui.inbox.formatConversationTimestamp
 import com.example.smsfirewall.ui.inbox.formatMessageTimestamp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -156,11 +155,7 @@ class SmsUtilsTest {
         assertTrue(result.contains(":"))
     }
 
-    @Test
-    fun `formatConversationTimestamp returns non-empty`() {
-        val result = formatConversationTimestamp(System.currentTimeMillis())
-        assertTrue(result.isNotBlank())
-    }
+    // formatConversationTimestamp requires Context, tested via instrumented tests
 
     // ─── Helper ─────────────────────────────────────────────────
 

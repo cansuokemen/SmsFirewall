@@ -12,17 +12,20 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.example.smsfirewall.data.DatabaseProvider
 import com.example.smsfirewall.data.SmsRepository
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.example.smsfirewall.ui.inbox.BlockedSmsScreen
+import com.example.smsfirewall.ui.theme.ThemePreferenceStore
 import com.example.smsfirewall.ui.theme.SmsFirewallTheme
 
 class MainActivity : ComponentActivity() {
@@ -45,11 +48,7 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
-
-        // Splash ekranını UI hazır olana kadar göster
-        splashScreen.setKeepOnScreenCondition { !uiStarted }
 
         smsRepository = SmsRepository(DatabaseProvider.getDatabase(this).smsDao())
         continueOnlyIfDefaultSms()
@@ -73,7 +72,7 @@ class MainActivity : ComponentActivity() {
 
     private fun isDefaultSmsApp(): Boolean {
         val hasTelephony =
-            packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEPHONY)
+            packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)
         if (!hasTelephony) return true
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -86,7 +85,7 @@ class MainActivity : ComponentActivity() {
 
     private fun requestDefaultSmsRoleOrFinish() {
         val hasTelephony =
-            packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEPHONY)
+            packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)
         if (!hasTelephony) {
             finish()
             return
@@ -124,8 +123,10 @@ class MainActivity : ComponentActivity() {
         if (uiStarted) return
         uiStarted = true
         enableEdgeToEdge()
+        val themePreferenceStore = ThemePreferenceStore(this)
         setContent {
-            SmsFirewallTheme {
+            var themeMode by remember { mutableStateOf(themePreferenceStore.getThemeMode()) }
+            SmsFirewallTheme(themeMode = themeMode) {
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
@@ -133,6 +134,11 @@ class MainActivity : ComponentActivity() {
                 ) {
                     BlockedSmsScreen(
                         repository = smsRepository,
+                        currentThemeMode = themeMode,
+                        onThemeModeChanged = { newMode ->
+                            themePreferenceStore.setThemeMode(newMode)
+                            themeMode = newMode
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
                 }

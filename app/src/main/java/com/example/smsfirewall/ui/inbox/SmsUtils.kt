@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.SmsStatus
+import com.example.smsfirewall.R
 import com.example.smsfirewall.ui.theme.AvatarColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -287,7 +288,8 @@ internal suspend fun readPhoneNumberFromPickerUri(
 
 internal fun buildConversations(
     messages: List<SmsEntity>,
-    unreadIds: Set<Long> = emptySet()
+    unreadIds: Set<Long> = emptySet(),
+    unknownSenderLabel: String = "Bilinmeyen gönderici"
 ): List<SmsConversation> {
     return messages
         .groupBy { normalizeSenderForGrouping(it.sender) }
@@ -304,7 +306,7 @@ internal fun buildConversations(
 
             SmsConversation(
                 senderKey = senderKey.ifBlank { "unknown_sender_${latestMessage.id}" },
-                displaySender = latestMessage.sender.ifBlank { "Bilinmeyen gönderici" },
+                displaySender = latestMessage.sender.ifBlank { unknownSenderLabel },
                 messages = sortedMessages,
                 latestReceivedAt = latestMessage.receivedAt,
                 unreadCount = unread
@@ -465,7 +467,7 @@ internal fun avatarColorForSender(sender: String): Color {
 @Suppress("DEPRECATION")
 private val trLocale = Locale("tr", "TR")
 
-internal fun formatConversationTimestamp(timestampMs: Long): String {
+internal fun formatConversationTimestamp(context: Context, timestampMs: Long): String {
     val now = Calendar.getInstance()
     val msgTime = Calendar.getInstance().apply { timeInMillis = timestampMs }
 
@@ -481,7 +483,7 @@ internal fun formatConversationTimestamp(timestampMs: Long): String {
         yesterday.get(Calendar.DAY_OF_YEAR) == msgTime.get(Calendar.DAY_OF_YEAR)
 
     if (isYesterday) {
-        return "Dün"
+        return context.getString(R.string.yesterday)
     }
 
     val isSameYear = now.get(Calendar.YEAR) == msgTime.get(Calendar.YEAR)
@@ -497,18 +499,18 @@ internal fun formatMessageTimestamp(timestampMs: Long): String {
     return SimpleDateFormat("HH:mm", trLocale).format(Date(timestampMs))
 }
 
-internal fun formatDateHeader(timestampMs: Long): String {
+internal fun formatDateHeader(context: Context, timestampMs: Long): String {
     val now = Calendar.getInstance()
     val msgTime = Calendar.getInstance().apply { timeInMillis = timestampMs }
 
     val isToday = now.get(Calendar.YEAR) == msgTime.get(Calendar.YEAR) &&
         now.get(Calendar.DAY_OF_YEAR) == msgTime.get(Calendar.DAY_OF_YEAR)
-    if (isToday) return "Bugün"
+    if (isToday) return context.getString(R.string.today)
 
     val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
     val isYesterday = yesterday.get(Calendar.YEAR) == msgTime.get(Calendar.YEAR) &&
         yesterday.get(Calendar.DAY_OF_YEAR) == msgTime.get(Calendar.DAY_OF_YEAR)
-    if (isYesterday) return "Dün"
+    if (isYesterday) return context.getString(R.string.yesterday)
 
     val isSameYear = now.get(Calendar.YEAR) == msgTime.get(Calendar.YEAR)
     return if (isSameYear) {

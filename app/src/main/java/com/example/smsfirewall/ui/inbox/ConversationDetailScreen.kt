@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,6 +46,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -56,7 +56,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
 import com.example.smsfirewall.data.local.SmsEntity
-import java.util.Calendar
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -72,6 +71,7 @@ internal fun ConversationDetailScreen(
     onDeleteSpam: (SmsEntity) -> Unit,
     onSendMessage: (String) -> Unit
 ) {
+    val context = LocalContext.current
     var draftMessage by remember(conversation.senderKey) { mutableStateOf("") }
     val listState = rememberLazyListState()
     val focusManager = LocalFocusManager.current
@@ -158,9 +158,9 @@ internal fun ConversationDetailScreen(
         ) {
             var lastDateHeader: String? = null
             displayMessages.forEachIndexed { index, sms ->
-                val dateHeader = formatDateHeader(sms.receivedAt)
+                val dateHeader = formatDateHeader(context, sms.receivedAt)
                 val nextSms = displayMessages.getOrNull(index + 1)
-                val nextDateHeader = nextSms?.let { formatDateHeader(it.receivedAt) }
+                val nextDateHeader = nextSms?.let { formatDateHeader(context, it.receivedAt) }
 
                 item(key = sms.id) {
                     DetailMessageBubble(

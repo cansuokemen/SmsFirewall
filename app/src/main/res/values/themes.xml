@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.SmsFirewall" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#E8EAF6</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
-        <item name="postSplashScreenTheme">@style/Theme.SmsFirewall.Main</item>
-    </style>
+    <style name="Theme.SmsFirewall" parent="android:Theme.Material.Light.NoActionBar" />
 
-    <style name="Theme.SmsFirewall.Main" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>

@@ -1,12 +1,12 @@
 package com.example.smsfirewall.ui.theme
 
-import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 private val DarkColorScheme = darkColorScheme(
     primary = Teal80,
@@ -48,9 +48,14 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun SmsFirewallTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit
 ) {
+    val darkTheme = when (themeMode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
     MaterialTheme(

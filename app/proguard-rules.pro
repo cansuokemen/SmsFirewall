@@ -27,4 +27,4 @@
 # ─── BroadcastReceivers (referenced from manifest) ──────────────
 -keep class com.example.smsfirewall.SmsReceiver { *; }
 -keep class com.example.smsfirewall.MmsReceiver { *; }
--keep class com.example.smsfirewall.RespondViaMessageActivity { *; }
+-keep class com.example.smsfirewall.RespondViaMessageService { *; }
