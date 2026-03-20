@@ -42,49 +42,34 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
-import com.example.smsfirewall.data.local.SmsEntity
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 internal fun ConversationListItem(
-    modifier: Modifier = Modifier,
     conversation: SmsConversation,
     contactName: String?,
-    isNotificationsMuted: Boolean,
-    showReason: Boolean,
-    isSelectionMode: Boolean = false,
-    isSelected: Boolean = false,
-    onToggleSelection: () -> Unit = {},
-    onLongClick: () -> Unit = {},
-    onOpenConversation: () -> Unit,
-    isActionsVisible: Boolean,
-    onShowActions: () -> Unit,
-    onHideActions: () -> Unit,
-    onMessageLongPress: (SmsEntity) -> Unit,
-    onSwipeDeleteConversation: () -> Unit,
-    onMuteNotifications: () -> Unit,
-    onUnmuteNotifications: () -> Unit
+    state: ConversationItemState,
+    callbacks: ConversationItemCallbacks,
+    modifier: Modifier = Modifier
 ) {
-    val currentIsActionsVisible by rememberUpdatedState(isActionsVisible)
-    val currentOnShowActions by rememberUpdatedState(onShowActions)
-    val currentOnHideActions by rememberUpdatedState(onHideActions)
-    val currentOnSwipeDeleteConversation by rememberUpdatedState(onSwipeDeleteConversation)
+    val currentState by rememberUpdatedState(state)
+    val currentCallbacks by rememberUpdatedState(callbacks)
 
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
                 SwipeToDismissBoxValue.EndToStart -> {
-                    if (currentIsActionsVisible) {
-                        currentOnSwipeDeleteConversation()
+                    if (currentState.isActionsVisible) {
+                        currentCallbacks.onSwipeDeleteConversation()
                         true
                     } else {
-                        currentOnShowActions()
+                        currentCallbacks.onShowActions()
                         false
                     }
                 }
 
                 SwipeToDismissBoxValue.StartToEnd -> {
-                    currentOnHideActions()
+                    currentCallbacks.onHideActions()
                     false
                 }
 
@@ -102,8 +87,8 @@ internal fun ConversationListItem(
     SwipeToDismissBox(
         modifier = modifier,
         state = dismissState,
-        enableDismissFromStartToEnd = !isSelectionMode,
-        enableDismissFromEndToStart = !isSelectionMode,
+        enableDismissFromStartToEnd = !state.isSelectionMode,
+        enableDismissFromEndToStart = !state.isSelectionMode,
         backgroundContent = {
             val direction = dismissState.dismissDirection
             if (direction == SwipeToDismissBoxValue.EndToStart) {
@@ -130,17 +115,17 @@ internal fun ConversationListItem(
                     .fillMaxWidth()
                     .combinedClickable(
                         onClick = {
-                            if (isActionsVisible) {
-                                onHideActions()
+                            if (state.isActionsVisible) {
+                                callbacks.onHideActions()
                             } else {
-                                onOpenConversation()
+                                callbacks.onOpenConversation()
                             }
                         },
-                        onLongClick = onLongClick
+                        onLongClick = callbacks.onLongClick
                     ),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isSelected) {
+                    containerColor = if (state.isSelected) {
                         MaterialTheme.colorScheme.primaryContainer
                     } else {
                         MaterialTheme.colorScheme.surface
@@ -153,15 +138,13 @@ internal fun ConversationListItem(
                     verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Checkbox for selection mode
-                    if (isSelectionMode) {
+                    if (state.isSelectionMode) {
                         Checkbox(
-                            checked = isSelected,
-                            onCheckedChange = { onToggleSelection() },
+                            checked = state.isSelected,
+                            onCheckedChange = { callbacks.onToggleSelection() },
                             modifier = Modifier.padding(end = 0.dp)
                         )
                     }
-                    // Avatar
                     Box(
                         modifier = Modifier
                             .size(48.dp)
@@ -201,11 +184,11 @@ internal fun ConversationListItem(
                                             MaterialTheme.colorScheme.onSurfaceVariant
                                         },
                                         fontWeight = if (hasUnread) FontWeight.Medium else FontWeight.Normal,
-                                        maxLines = if (showReason) 1 else 2,
+                                        maxLines = if (state.showReason) 1 else 2,
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.padding(top = 2.dp)
                                     )
-                                    if (showReason) {
+                                    if (state.showReason) {
                                         Text(
                                             text = stringResource(R.string.reason_prefix, latestMessage.reason),
                                             style = MaterialTheme.typography.bodySmall,
@@ -242,7 +225,11 @@ internal fun ConversationListItem(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            text = if (conversation.unreadCount > 99) "99+" else conversation.unreadCount.toString(),
+                                            text = if (conversation.unreadCount > UNREAD_BADGE_MAX) {
+                                                "${UNREAD_BADGE_MAX}+"
+                                            } else {
+                                                conversation.unreadCount.toString()
+                                            },
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onPrimary,
                                             fontWeight = FontWeight.Bold
@@ -255,7 +242,7 @@ internal fun ConversationListItem(
                 }
             }
 
-            if (isActionsVisible) {
+            if (state.isActionsVisible) {
                 Row(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
@@ -266,13 +253,13 @@ internal fun ConversationListItem(
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (isNotificationsMuted) {
+                    if (state.isNotificationsMuted) {
                         SwipeActionButton(
                             icon = Icons.Outlined.Notifications,
                             contentDescription = stringResource(R.string.cd_unmute_notifications),
                             onClick = {
-                                onHideActions()
-                                onUnmuteNotifications()
+                                callbacks.onHideActions()
+                                callbacks.onUnmuteNotifications()
                             }
                         )
                     } else {
@@ -280,8 +267,8 @@ internal fun ConversationListItem(
                             icon = Icons.Outlined.NotificationsOff,
                             contentDescription = stringResource(R.string.cd_mute_notifications),
                             onClick = {
-                                onHideActions()
-                                onMuteNotifications()
+                                callbacks.onHideActions()
+                                callbacks.onMuteNotifications()
                             }
                         )
                     }
@@ -290,8 +277,8 @@ internal fun ConversationListItem(
                         icon = Icons.Outlined.Delete,
                         contentDescription = stringResource(R.string.cd_delete_conversation),
                         onClick = {
-                            onHideActions()
-                            onSwipeDeleteConversation()
+                            callbacks.onHideActions()
+                            callbacks.onSwipeDeleteConversation()
                         }
                     )
                 }

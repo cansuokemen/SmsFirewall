@@ -14,7 +14,9 @@ object DatabaseProvider {
                 context.applicationContext,
                 AppDatabase::class.java,
                 "sms_firewall.db"
-            ).build().also { db ->
+            )
+                .addMigrations(AppDatabase.MIGRATION_1_2)
+                .build().also { db ->
                 instance = db
             }
         }

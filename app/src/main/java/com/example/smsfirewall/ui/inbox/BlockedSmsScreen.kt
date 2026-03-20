@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -20,19 +19,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
 import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.ui.theme.ThemeMode
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BlockedSmsScreen(
     viewModel: InboxViewModel,
@@ -227,37 +221,3 @@ fun BlockedSmsScreen(
     )
 }
 
-internal fun Modifier.swipeBackGesture(onBack: () -> Unit): Modifier = composed {
-    val swipeBackThresholdPx = with(LocalDensity.current) { SWIPE_BACK_THRESHOLD_DP.toPx() }
-    pointerInput(onBack, swipeBackThresholdPx) {
-        var draggedDistance = 0f
-        var backTriggered = false
-
-        detectHorizontalDragGestures(
-            onDragStart = {
-                draggedDistance = 0f
-                backTriggered = false
-            },
-            onHorizontalDrag = { change, dragAmount ->
-                if (dragAmount > 0f) {
-                    draggedDistance += dragAmount
-                }
-                if (!backTriggered && draggedDistance >= swipeBackThresholdPx) {
-                    backTriggered = true
-                    change.consume()
-                    onBack()
-                }
-            },
-            onDragEnd = {
-                draggedDistance = 0f
-                backTriggered = false
-            },
-            onDragCancel = {
-                draggedDistance = 0f
-                backTriggered = false
-            }
-        )
-    }
-}
-
-private val SWIPE_BACK_THRESHOLD_DP = 96.dp

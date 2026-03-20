@@ -1,9 +1,16 @@
 package com.example.smsfirewall.data.local
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "sms_messages")
+@Entity(
+    tableName = "sms_messages",
+    indices = [
+        Index("status"),
+        Index(value = ["status", "receivedAt"])
+    ]
+)
 data class SmsEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

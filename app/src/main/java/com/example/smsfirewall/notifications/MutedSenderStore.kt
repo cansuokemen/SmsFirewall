@@ -1,58 +1,44 @@
 package com.example.smsfirewall.notifications
 
 import android.content.Context
+import android.content.SharedPreferences
 import java.util.Locale
 
 class MutedSenderStore(context: Context) {
-    private val appContext = context.applicationContext
+    private val prefs: SharedPreferences =
+        context.applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
     fun mute(sender: String) {
         val normalizedSender = normalizeSender(sender)
         if (normalizedSender.isBlank()) return
 
-        val current = appContext
-            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            .getStringSet(KEY_MUTED_SENDERS, emptySet())
-            .orEmpty()
-            .toMutableSet()
+        val current = getMutedSenders().toMutableSet()
         if (current.none { normalizeSender(it) == normalizedSender }) {
             current.add(normalizedSender)
         }
 
-        appContext
-            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putStringSet(KEY_MUTED_SENDERS, current)
-            .apply()
+        prefs.edit().putStringSet(KEY_MUTED_SENDERS, current).apply()
     }
 
     fun isMuted(sender: String): Boolean {
         val normalizedSender = normalizeSender(sender)
         if (normalizedSender.isBlank()) return false
 
-        val current = appContext
-            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            .getStringSet(KEY_MUTED_SENDERS, emptySet())
-            .orEmpty()
-        return current.any { normalizeSender(it) == normalizedSender }
+        return getMutedSenders().any { normalizeSender(it) == normalizedSender }
     }
 
     fun unmute(sender: String) {
         val normalizedSender = normalizeSender(sender)
         if (normalizedSender.isBlank()) return
 
-        val current = appContext
-            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            .getStringSet(KEY_MUTED_SENDERS, emptySet())
-            .orEmpty()
-            .toMutableSet()
+        val current = getMutedSenders().toMutableSet()
         if (current.removeAll { normalizeSender(it) == normalizedSender }) {
-            appContext
-                .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-                .edit()
-                .putStringSet(KEY_MUTED_SENDERS, current)
-                .apply()
+            prefs.edit().putStringSet(KEY_MUTED_SENDERS, current).apply()
         }
+    }
+
+    private fun getMutedSenders(): Set<String> {
+        return prefs.getStringSet(KEY_MUTED_SENDERS, emptySet()).orEmpty()
     }
 
     private fun normalizeSender(sender: String): String {

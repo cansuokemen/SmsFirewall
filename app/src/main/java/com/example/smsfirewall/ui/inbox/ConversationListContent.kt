@@ -181,15 +181,14 @@ internal fun ConversationListContent(
                             val contactName = remember(conversation.displaySender) {
                                 viewModel.getContactName(conversation.displaySender)
                             }
-                            val isSelected = conversation.senderKey in viewModel.selectedConversationKeys
-                            ConversationListItem(
-                                modifier = Modifier.animateItem(),
-                                conversation = conversation,
-                                contactName = contactName,
-                                isNotificationsMuted = isSenderMuted,
-                                showReason = viewModel.selectedTab == InboxTab.SPAM,
+                            val itemState = ConversationItemState(
                                 isSelectionMode = viewModel.isSelectionMode,
-                                isSelected = isSelected,
+                                isSelected = conversation.senderKey in viewModel.selectedConversationKeys,
+                                isActionsVisible = viewModel.actionRevealedConversationKey == conversation.senderKey && !viewModel.isSelectionMode,
+                                isNotificationsMuted = isSenderMuted,
+                                showReason = viewModel.selectedTab == InboxTab.SPAM
+                            )
+                            val itemCallbacks = ConversationItemCallbacks(
                                 onToggleSelection = { viewModel.toggleSelection(conversation.senderKey) },
                                 onLongClick = { viewModel.enterSelectionMode(conversation.senderKey) },
                                 onOpenConversation = {
@@ -202,7 +201,6 @@ internal fun ConversationListContent(
                                         }
                                     }
                                 },
-                                isActionsVisible = viewModel.actionRevealedConversationKey == conversation.senderKey && !viewModel.isSelectionMode,
                                 onShowActions = {
                                     if (!viewModel.isSelectionMode) {
                                         viewModel.actionRevealedConversationKey = conversation.senderKey
@@ -223,6 +221,13 @@ internal fun ConversationListContent(
                                     viewModel.unmuteNotifications(conversation.displaySender)
                                     Toast.makeText(context, context.getString(R.string.notifications_unmuted), Toast.LENGTH_SHORT).show()
                                 }
+                            )
+                            ConversationListItem(
+                                modifier = Modifier.animateItem(),
+                                conversation = conversation,
+                                contactName = contactName,
+                                state = itemState,
+                                callbacks = itemCallbacks
                             )
                         }
                     }

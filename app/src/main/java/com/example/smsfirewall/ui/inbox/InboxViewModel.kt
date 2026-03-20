@@ -116,6 +116,9 @@ class InboxViewModel(
     // --- Kişi adı cache ---
     val contactNameCache = mutableStateMapOf<String, String?>()
     private val pendingLookups = mutableSetOf<String>()
+    private companion object {
+        const val MAX_CONTACT_CACHE_SIZE = 256
+    }
 
     // --- Notification warning ---
     val shouldShowNotificationWarning: Boolean
@@ -162,6 +165,9 @@ class InboxViewModel(
             viewModelScope.launch {
                 val name = withContext(Dispatchers.IO) {
                     resolveContactName(context, phoneNumber)
+                }
+                if (contactNameCache.size >= MAX_CONTACT_CACHE_SIZE) {
+                    contactNameCache.keys.firstOrNull()?.let { contactNameCache.remove(it) }
                 }
                 contactNameCache[phoneNumber] = name
             }
