@@ -128,26 +128,28 @@ fun BlockedSmsScreen(
                             contactName = viewModel.getContactName(conv.displaySender),
                             canSendMessage = viewModel.selectedTab == InboxTab.MESSAGES,
                             isSpamConversation = viewModel.selectedTab == InboxTab.SPAM,
-                            onBack = { viewModel.closeConversation() },
-                            onMessageLongPress = { sms -> viewModel.selectedForDelete = sms },
-                            onSpamMessageClick = { sms -> viewModel.openedSpamMessage = sms },
-                            onMarkAsNotSpam = { sms ->
-                                viewModel.markAsNotSpam(sms) { moved ->
-                                    if (moved) {
-                                        Toast.makeText(context, context.getString(R.string.message_moved), Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, context.getString(R.string.message_move_failed), Toast.LENGTH_SHORT).show()
+                            callbacks = DetailScreenCallbacks(
+                                onBack = { viewModel.closeConversation() },
+                                onMessageLongPress = { sms -> viewModel.selectedForDelete = sms },
+                                onSpamMessageClick = { sms -> viewModel.openedSpamMessage = sms },
+                                onMarkAsNotSpam = { sms ->
+                                    viewModel.markAsNotSpam(sms) { moved ->
+                                        if (moved) {
+                                            Toast.makeText(context, context.getString(R.string.message_moved), Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, context.getString(R.string.message_move_failed), Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
+                                onDeleteSpam = { sms -> viewModel.deleteSpam(sms) },
+                                onSendMessage = { messageBody ->
+                                    viewModel.sendAndStoreMessage(conv.displaySender, messageBody) { sent ->
+                                        if (!sent) {
+                                            Toast.makeText(context, context.getString(R.string.message_send_failed), Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                 }
-                            },
-                            onDeleteSpam = { sms -> viewModel.deleteSpam(sms) },
-                            onSendMessage = { messageBody ->
-                                viewModel.sendAndStoreMessage(conv.displaySender, messageBody) { sent ->
-                                    if (!sent) {
-                                        Toast.makeText(context, context.getString(R.string.message_send_failed), Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
+                            )
                         )
                     } else {
                         Box(modifier = Modifier.fillMaxSize())

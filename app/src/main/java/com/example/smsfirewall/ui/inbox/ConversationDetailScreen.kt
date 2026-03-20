@@ -64,12 +64,7 @@ internal fun ConversationDetailScreen(
     contactName: String?,
     canSendMessage: Boolean,
     isSpamConversation: Boolean,
-    onBack: () -> Unit,
-    onMessageLongPress: (SmsEntity) -> Unit,
-    onSpamMessageClick: (SmsEntity) -> Unit,
-    onMarkAsNotSpam: (SmsEntity) -> Unit,
-    onDeleteSpam: (SmsEntity) -> Unit,
-    onSendMessage: (String) -> Unit
+    callbacks: DetailScreenCallbacks
 ) {
     val context = LocalContext.current
     var draftMessage by remember(conversation.senderKey) { mutableStateOf("") }
@@ -96,14 +91,14 @@ internal fun ConversationDetailScreen(
         if (!canSendMessage) return
         val text = draftMessage.trim()
         if (text.isBlank()) return
-        onSendMessage(text)
+        callbacks.onSendMessage(text)
         draftMessage = ""
     }
 
     val handleBack = {
         focusManager.clearFocus()
         keyboardController?.hide()
-        onBack()
+        callbacks.onBack()
     }
 
     val displayName = contactName ?: conversation.displaySender
@@ -169,15 +164,15 @@ internal fun ConversationDetailScreen(
                             focusManager.clearFocus()
                             keyboardController?.hide()
                             if (isSpamConversation) {
-                                onSpamMessageClick(sms)
+                                callbacks.onSpamMessageClick(sms)
                             }
                         },
-                        onLongPress = { onMessageLongPress(sms) }
+                        onLongPress = { callbacks.onMessageLongPress(sms) }
                     )
                     if (isSpamConversation) {
                         SpamMessageActionRow(
-                            onMarkAsNotSpam = { onMarkAsNotSpam(sms) },
-                            onDelete = { onDeleteSpam(sms) }
+                            onMarkAsNotSpam = { callbacks.onMarkAsNotSpam(sms) },
+                            onDelete = { callbacks.onDeleteSpam(sms) }
                         )
                     }
                 }

@@ -2,37 +2,37 @@ package com.example.smsfirewall.notifications
 
 import android.content.Context
 import android.content.SharedPreferences
-import java.util.Locale
+import com.example.smsfirewall.util.normalizeSender
 
 class MutedSenderStore(context: Context) {
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
     fun mute(sender: String) {
-        val normalizedSender = normalizeSender(sender)
-        if (normalizedSender.isBlank()) return
+        val normalized = normalizeSender(sender)
+        if (normalized.isBlank()) return
 
         val current = getMutedSenders().toMutableSet()
-        if (current.none { normalizeSender(it) == normalizedSender }) {
-            current.add(normalizedSender)
+        if (current.none { normalizeSender(it) == normalized }) {
+            current.add(normalized)
         }
 
         prefs.edit().putStringSet(KEY_MUTED_SENDERS, current).apply()
     }
 
     fun isMuted(sender: String): Boolean {
-        val normalizedSender = normalizeSender(sender)
-        if (normalizedSender.isBlank()) return false
+        val normalized = normalizeSender(sender)
+        if (normalized.isBlank()) return false
 
-        return getMutedSenders().any { normalizeSender(it) == normalizedSender }
+        return getMutedSenders().any { normalizeSender(it) == normalized }
     }
 
     fun unmute(sender: String) {
-        val normalizedSender = normalizeSender(sender)
-        if (normalizedSender.isBlank()) return
+        val normalized = normalizeSender(sender)
+        if (normalized.isBlank()) return
 
         val current = getMutedSenders().toMutableSet()
-        if (current.removeAll { normalizeSender(it) == normalizedSender }) {
+        if (current.removeAll { normalizeSender(it) == normalized }) {
             prefs.edit().putStringSet(KEY_MUTED_SENDERS, current).apply()
         }
     }
@@ -41,27 +41,8 @@ class MutedSenderStore(context: Context) {
         return prefs.getStringSet(KEY_MUTED_SENDERS, emptySet()).orEmpty()
     }
 
-    private fun normalizeSender(sender: String): String {
-        val alphanumeric = sender
-            .trim()
-            .lowercase(Locale.ROOT)
-            .filter { it.isLetterOrDigit() }
-        if (alphanumeric.isBlank()) return ""
-
-        return if (alphanumeric.all { it.isDigit() }) {
-            if (alphanumeric.length > PHONE_COMPARE_LENGTH) {
-                alphanumeric.takeLast(PHONE_COMPARE_LENGTH)
-            } else {
-                alphanumeric
-            }
-        } else {
-            alphanumeric
-        }
-    }
-
     private companion object {
         const val PREF_NAME = "sms_sender_preferences"
         const val KEY_MUTED_SENDERS = "muted_senders"
-        const val PHONE_COMPARE_LENGTH = 10
     }
 }

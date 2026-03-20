@@ -3,7 +3,6 @@ package com.example.smsfirewall.ui.inbox
 import com.example.smsfirewall.R
 import com.example.smsfirewall.data.local.SmsEntity
 
-internal const val PHONE_COMPARE_LENGTH = 10
 internal const val SENT_MESSAGE_REASON = "Sent by user"
 internal const val SYSTEM_PROVIDER_REASON = "From system provider"
 internal const val MESSAGE_TYPE_INBOX = 1
@@ -46,4 +45,13 @@ data class ConversationItemCallbacks(
     val onSwipeDeleteConversation: () -> Unit = {},
     val onMuteNotifications: () -> Unit = {},
     val onUnmuteNotifications: () -> Unit = {}
+)
+
+data class DetailScreenCallbacks(
+    val onBack: () -> Unit,
+    val onMessageLongPress: (SmsEntity) -> Unit = {},
+    val onSpamMessageClick: (SmsEntity) -> Unit = {},
+    val onMarkAsNotSpam: (SmsEntity) -> Unit = {},
+    val onDeleteSpam: (SmsEntity) -> Unit = {},
+    val onSendMessage: (String) -> Unit = {}
 )

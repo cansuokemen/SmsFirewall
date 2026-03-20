@@ -235,83 +235,22 @@ internal fun ConversationListContent(
             }
         }
 
-        // Bottom bar with search and FAB
-        AnimatedVisibility(
+        BottomSearchBar(
             visible = isBottomBarVisible && !viewModel.isSelectionMode,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            searchInput = viewModel.conversationSearchInput,
+            onSearchInputChanged = { value ->
+                viewModel.conversationSearchInput = value
+                viewModel.conversationSearchQuery = value.trim()
+            },
+            onSearchSubmit = {
+                viewModel.conversationSearchQuery = viewModel.conversationSearchInput.trim()
+                focusManager.clearFocus()
+                keyboardController?.hide()
+            },
+            showNewMessageFab = viewModel.selectedTab == InboxTab.MESSAGES,
+            onNewMessage = { viewModel.openNewMessage() },
             modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 12.dp)
-                    .background(
-                        MaterialTheme.colorScheme.background,
-                        RoundedCornerShape(28.dp)
-                    )
-                    .imePadding(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedTextField(
-                    value = viewModel.conversationSearchInput,
-                    onValueChange = { value ->
-                        viewModel.conversationSearchInput = value
-                        viewModel.conversationSearchQuery = value.trim()
-                    },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    shape = RoundedCornerShape(28.dp),
-                    placeholder = {
-                        Text(
-                            text = stringResource(R.string.search_placeholder),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Filled.Search,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
-                        cursorColor = MaterialTheme.colorScheme.primary,
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    ),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(
-                        onSearch = {
-                            viewModel.conversationSearchQuery = viewModel.conversationSearchInput.trim()
-                            focusManager.clearFocus()
-                            keyboardController?.hide()
-                        }
-                    )
-                )
-                if (viewModel.selectedTab == InboxTab.MESSAGES) {
-                    FloatingActionButton(
-                        onClick = { viewModel.openNewMessage() },
-                        modifier = Modifier.size(56.dp),
-                        shape = CircleShape,
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_message_send),
-                            contentDescription = stringResource(R.string.cd_new_message)
-                        )
-                    }
-                }
-            }
-        }
+        )
     }
 }
 
@@ -363,6 +302,85 @@ private fun SelectionModeHeader(
                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                 }
             )
+        }
+    }
+}
+
+@Composable
+private fun BottomSearchBar(
+    visible: Boolean,
+    searchInput: String,
+    onSearchInputChanged: (String) -> Unit,
+    onSearchSubmit: () -> Unit,
+    showNewMessageFab: Boolean,
+    onNewMessage: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .background(
+                    MaterialTheme.colorScheme.background,
+                    RoundedCornerShape(28.dp)
+                )
+                .imePadding(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = searchInput,
+                onValueChange = onSearchInputChanged,
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                shape = RoundedCornerShape(28.dp),
+                placeholder = {
+                    Text(
+                        text = stringResource(R.string.search_placeholder),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+                    cursorColor = MaterialTheme.colorScheme.primary,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                ),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() })
+            )
+            if (showNewMessageFab) {
+                FloatingActionButton(
+                    onClick = onNewMessage,
+                    modifier = Modifier.size(56.dp),
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_message_send),
+                        contentDescription = stringResource(R.string.cd_new_message)
+                    )
+                }
+            }
         }
     }
 }

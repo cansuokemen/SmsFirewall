@@ -1,6 +1,8 @@
 package com.example.smsfirewall.ui.inbox
 
 import com.example.smsfirewall.data.local.SmsEntity
+import com.example.smsfirewall.util.PHONE_COMPARE_LENGTH
+import com.example.smsfirewall.util.normalizeSender
 import java.util.Locale
 
 internal fun buildConversations(
@@ -33,24 +35,7 @@ internal fun buildConversations(
 }
 
 internal fun normalizeSenderForGrouping(sender: String): String {
-    val alphanumeric = sender
-        .trim()
-        .lowercase(Locale.ROOT)
-        .filter { it.isLetterOrDigit() }
-
-    if (alphanumeric.isBlank()) {
-        return ""
-    }
-
-    return if (alphanumeric.all { it.isDigit() }) {
-        if (alphanumeric.length > PHONE_COMPARE_LENGTH) {
-            alphanumeric.takeLast(PHONE_COMPARE_LENGTH)
-        } else {
-            alphanumeric
-        }
-    } else {
-        alphanumeric
-    }
+    return normalizeSender(sender)
 }
 
 internal fun normalizeForSearch(value: String): String {
