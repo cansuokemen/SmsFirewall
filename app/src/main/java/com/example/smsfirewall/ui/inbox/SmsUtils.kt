@@ -40,12 +40,12 @@ internal const val MESSAGE_TYPE_INBOX = 1
 internal const val MESSAGE_TYPE_SENT = 2
 private const val TAG = "SmsUtils"
 
-internal enum class InboxTab(val titleResId: Int) {
+enum class InboxTab(val titleResId: Int) {
     MESSAGES(com.example.smsfirewall.R.string.tab_messages),
     SPAM(com.example.smsfirewall.R.string.tab_spam)
 }
 
-internal data class SmsConversation(
+data class SmsConversation(
     val senderKey: String,
     val displaySender: String,
     val messages: List<SmsEntity>,
@@ -53,7 +53,7 @@ internal data class SmsConversation(
     val unreadCount: Int = 0
 )
 
-internal data class SystemMessagesResult(
+data class SystemMessagesResult(
     val messages: List<SmsEntity>,
     val unreadIds: Set<Long>
 )
@@ -105,7 +105,7 @@ internal fun querySystemMessages(context: Context): List<SmsEntity> {
     return querySystemMessagesWithReadStatus(context).messages
 }
 
-private fun querySystemMessagesWithReadStatus(context: Context): SystemMessagesResult {
+internal fun querySystemMessagesWithReadStatus(context: Context): SystemMessagesResult {
     val projection = arrayOf("_id", "address", "body", "date", "type", "read")
     val selection = "type IN (?, ?)"
     val selectionArgs = arrayOf(MESSAGE_TYPE_INBOX.toString(), MESSAGE_TYPE_SENT.toString())

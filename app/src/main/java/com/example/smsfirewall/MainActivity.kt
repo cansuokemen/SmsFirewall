@@ -24,7 +24,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModelProvider
 import com.example.smsfirewall.ui.inbox.BlockedSmsScreen
+import com.example.smsfirewall.ui.inbox.InboxViewModel
+import com.example.smsfirewall.ui.inbox.InboxViewModelFactory
 import com.example.smsfirewall.ui.theme.ThemePreferenceStore
 import com.example.smsfirewall.ui.theme.SmsFirewallTheme
 
@@ -124,6 +127,10 @@ class MainActivity : ComponentActivity() {
         uiStarted = true
         enableEdgeToEdge()
         val themePreferenceStore = ThemePreferenceStore(this)
+        val inboxViewModel = ViewModelProvider(
+            this,
+            InboxViewModelFactory(application, smsRepository)
+        )[InboxViewModel::class.java]
         setContent {
             var themeMode by remember { mutableStateOf(themePreferenceStore.getThemeMode()) }
             SmsFirewallTheme(themeMode = themeMode) {
@@ -133,7 +140,7 @@ class MainActivity : ComponentActivity() {
                         .windowInsetsPadding(WindowInsets.safeDrawing)
                 ) {
                     BlockedSmsScreen(
-                        repository = smsRepository,
+                        viewModel = inboxViewModel,
                         currentThemeMode = themeMode,
                         onThemeModeChanged = { newMode ->
                             themePreferenceStore.setThemeMode(newMode)
