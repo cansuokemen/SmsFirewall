@@ -25,6 +25,8 @@ import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationConstants
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -104,6 +106,20 @@ class InboxViewModel(
     // --- Swipe aksiyonları ---
     var actionRevealedConversationKey by mutableStateOf<String?>(null)
 
+    // --- Undo silme ---
+    data class PendingDelete(
+        val conversations: List<SmsConversation>,
+        val tab: InboxTab
+    )
+
+    var pendingDelete by mutableStateOf<PendingDelete?>(null)
+        private set
+    private var pendingDeleteJob: Job? = null
+    private companion object {
+        const val MAX_CONTACT_CACHE_SIZE = 256
+        const val UNDO_TIMEOUT_MS = 4000L
+    }
+
     // --- Yenileme ---
     var isRefreshing by mutableStateOf(false)
         private set
@@ -116,9 +132,6 @@ class InboxViewModel(
     // --- Kişi adı cache ---
     val contactNameCache = mutableStateMapOf<String, String?>()
     private val pendingLookups = mutableSetOf<String>()
-    private companion object {
-        const val MAX_CONTACT_CACHE_SIZE = 256
-    }
 
     // --- Notification warning ---
     val shouldShowNotificationWarning: Boolean
@@ -269,19 +282,11 @@ class InboxViewModel(
     fun batchDeleteSelected(conversations: List<SmsConversation>) {
         showBatchDeleteConfirm = false
         val keysToDelete = selectedConversationKeys.toSet()
-        viewModelScope.launch {
-            val toDelete = conversations.filter { it.senderKey in keysToDelete }
-            for (conv in toDelete) {
-                for (sms in conv.messages) {
-                    if (selectedTab == InboxTab.MESSAGES) {
-                        deleteSmsFromSystemProvider(context, sms.id)
-                    } else {
-                        repository.delete(sms)
-                    }
-                }
-            }
-            isSelectionMode = false
-            selectedConversationKeys = emptySet()
+        val toDelete = conversations.filter { it.senderKey in keysToDelete }
+        isSelectionMode = false
+        selectedConversationKeys = emptySet()
+        if (toDelete.isNotEmpty()) {
+            schedulePendingDelete(PendingDelete(toDelete, selectedTab))
         }
     }
 
@@ -289,9 +294,41 @@ class InboxViewModel(
 
     fun deleteConversation(conversation: SmsConversation) {
         actionRevealedConversationKey = null
+        schedulePendingDelete(PendingDelete(listOf(conversation), selectedTab))
+    }
+
+    fun undoDelete() {
+        pendingDeleteJob?.cancel()
+        pendingDelete = null
+    }
+
+    fun commitPendingDelete() {
+        val delete = pendingDelete ?: return
+        pendingDeleteJob?.cancel()
+        pendingDelete = null
         viewModelScope.launch {
-            conversation.messages.forEach { sms ->
-                if (selectedTab == InboxTab.MESSAGES) {
+            performDelete(delete)
+        }
+    }
+
+    private fun schedulePendingDelete(delete: PendingDelete) {
+        // Eğer önceki bir pending varsa, önce onu commit et
+        pendingDelete?.let { previous ->
+            pendingDeleteJob?.cancel()
+            viewModelScope.launch { performDelete(previous) }
+        }
+        pendingDelete = delete
+        pendingDeleteJob = viewModelScope.launch {
+            delay(UNDO_TIMEOUT_MS)
+            pendingDelete = null
+            performDelete(delete)
+        }
+    }
+
+    private suspend fun performDelete(delete: PendingDelete) {
+        for (conv in delete.conversations) {
+            for (sms in conv.messages) {
+                if (delete.tab == InboxTab.MESSAGES) {
                     deleteSmsFromSystemProvider(context, sms.id)
                 } else {
                     repository.delete(sms)

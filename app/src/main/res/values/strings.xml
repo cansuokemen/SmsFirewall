@@ -52,6 +52,9 @@
     <string name="message_copied">Mesaj kopyalandı</string>
     <string name="notifications_muted">Bildirim kapatıldı</string>
     <string name="notifications_unmuted">Bildirim açıldı</string>
+    <string name="conversation_deleted">Konuşma silindi</string>
+    <string name="conversations_deleted">%1$d konuşma silindi</string>
+    <string name="undo">Geri Al</string>
     <string name="contact_pick_failed">Kişi seçilemedi</string>
     <string name="number_not_found">Numara bulunamadı</string>
     <string name="enter_number">Numara girin</string>

@@ -9,8 +9,14 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -49,10 +55,18 @@ fun BlockedSmsScreen(
     val visibleConversations = remember(visibleMessages, currentUnreadIds, unknownSenderLabel) {
         buildConversations(visibleMessages, currentUnreadIds, unknownSenderLabel)
     }
-    val filteredConversations = remember(visibleConversations, viewModel.conversationSearchQuery) {
+    // Pending delete olan konuşmaları listeden gizle
+    val pendingDeleteKeys = remember(viewModel.pendingDelete) {
+        viewModel.pendingDelete?.conversations?.map { it.senderKey }?.toSet() ?: emptySet()
+    }
+    val displayConversations = remember(visibleConversations, pendingDeleteKeys) {
+        if (pendingDeleteKeys.isEmpty()) visibleConversations
+        else visibleConversations.filter { it.senderKey !in pendingDeleteKeys }
+    }
+    val filteredConversations = remember(displayConversations, viewModel.conversationSearchQuery) {
         val query = viewModel.conversationSearchQuery.trim()
-        if (query.isBlank()) visibleConversations
-        else visibleConversations.filter { it.matchesSearchQuery(query) }
+        if (query.isBlank()) displayConversations
+        else displayConversations.filter { it.matchesSearchQuery(query) }
     }
     val openedConversation = remember(viewModel.openedConversationKey, visibleConversations) {
         viewModel.openedConversationKey?.let { key -> visibleConversations.firstOrNull { it.senderKey == key } }
@@ -105,7 +119,36 @@ fun BlockedSmsScreen(
         else -> ScreenState.LIST
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    // Snackbar for undo
+    val snackbarHostState = remember { SnackbarHostState() }
+    val undoLabel = stringResource(R.string.undo)
+    val deletedSingleLabel = stringResource(R.string.conversation_deleted)
+
+    LaunchedEffect(viewModel.pendingDelete) {
+        val pending = viewModel.pendingDelete ?: return@LaunchedEffect
+        val count = pending.conversations.size
+        val message = if (count == 1) deletedSingleLabel
+        else context.getString(R.string.conversations_deleted, count)
+
+        val result = snackbarHostState.showSnackbar(
+            message = message,
+            actionLabel = undoLabel,
+            duration = SnackbarDuration.Short
+        )
+        when (result) {
+            SnackbarResult.ActionPerformed -> viewModel.undoDelete()
+            SnackbarResult.Dismissed -> viewModel.commitPendingDelete()
+        }
+    }
+
+    Scaffold(
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        modifier = modifier.fillMaxSize()
+    ) { innerPadding ->
+    Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
         AnimatedContent(
             targetState = currentScreen,
             transitionSpec = {
@@ -221,5 +264,6 @@ fun BlockedSmsScreen(
         onConfirm = { viewModel.batchDeleteSelected(filteredConversations) },
         onDismiss = { viewModel.showBatchDeleteConfirm = false }
     )
+    } // Scaffold
 }
 
