@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
@@ -31,7 +32,8 @@ internal fun MessageOptionsDialog(
     sms: SmsEntity?,
     onDismiss: () -> Unit,
     onCopy: (SmsEntity) -> Unit,
-    onDelete: (SmsEntity) -> Unit
+    onDelete: (SmsEntity) -> Unit,
+    onBlockSender: ((SmsEntity) -> Unit)? = null
 ) {
     if (sms == null) return
 
@@ -78,6 +80,30 @@ internal fun MessageOptionsDialog(
                             text = stringResource(R.string.delete_message),
                             color = MaterialTheme.colorScheme.error
                         )
+                    }
+                }
+                if (onBlockSender != null) {
+                    TextButton(
+                        onClick = { onBlockSender(sms) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Start,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Block,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = stringResource(R.string.block_sender),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
             }

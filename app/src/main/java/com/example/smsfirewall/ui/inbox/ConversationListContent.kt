@@ -31,6 +31,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Deselect
 import androidx.compose.material.icons.outlined.SelectAll
@@ -108,6 +109,14 @@ internal fun ConversationListContent(
                         } else {
                             viewModel.selectAll(filteredConversations.map { it.senderKey }.toSet())
                         }
+                    },
+                    onBlock = {
+                        val selectedSenders = filteredConversations
+                            .filter { it.senderKey in viewModel.selectedConversationKeys }
+                            .map { it.displaySender }
+                        selectedSenders.forEach { sender -> viewModel.addBlockedSender(sender) }
+                        viewModel.exitSelectionMode()
+                        Toast.makeText(context, context.getString(R.string.sender_blocked), Toast.LENGTH_SHORT).show()
                     },
                     onDelete = { viewModel.showBatchDeleteConfirm = true },
                     hasSelection = viewModel.selectedConversationKeys.isNotEmpty()
@@ -220,6 +229,10 @@ internal fun ConversationListContent(
                                 onUnmuteNotifications = {
                                     viewModel.unmuteNotifications(conversation.displaySender)
                                     Toast.makeText(context, context.getString(R.string.notifications_unmuted), Toast.LENGTH_SHORT).show()
+                                },
+                                onBlockSender = {
+                                    viewModel.addBlockedSender(conversation.displaySender)
+                                    Toast.makeText(context, context.getString(R.string.sender_blocked), Toast.LENGTH_SHORT).show()
                                 }
                             )
                             ConversationListItem(
@@ -260,6 +273,7 @@ private fun SelectionModeHeader(
     allSelected: Boolean,
     onClose: () -> Unit,
     onToggleSelectAll: () -> Unit,
+    onBlock: () -> Unit,
     onDelete: () -> Unit,
     hasSelection: Boolean
 ) {
@@ -287,6 +301,20 @@ private fun SelectionModeHeader(
                 contentDescription = stringResource(
                     if (allSelected) R.string.deselect_all else R.string.select_all
                 )
+            )
+        }
+        IconButton(
+            onClick = onBlock,
+            enabled = hasSelection
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Block,
+                contentDescription = stringResource(R.string.block_sender),
+                tint = if (hasSelection) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                }
             )
         }
         IconButton(

@@ -44,7 +44,8 @@ data class ConversationItemCallbacks(
     val onMessageLongPress: (SmsEntity) -> Unit = {},
     val onSwipeDeleteConversation: () -> Unit = {},
     val onMuteNotifications: () -> Unit = {},
-    val onUnmuteNotifications: () -> Unit = {}
+    val onUnmuteNotifications: () -> Unit = {},
+    val onBlockSender: () -> Unit = {}
 )
 
 data class DetailScreenCallbacks(

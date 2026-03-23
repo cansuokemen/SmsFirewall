@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsOff
@@ -272,6 +273,15 @@ internal fun ConversationListItem(
                             }
                         )
                     }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    SwipeActionButton(
+                        icon = Icons.Outlined.Block,
+                        contentDescription = stringResource(R.string.cd_block_sender),
+                        onClick = {
+                            callbacks.onHideActions()
+                            callbacks.onBlockSender()
+                        }
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
                     SwipeActionButton(
                         icon = Icons.Outlined.Delete,

@@ -129,4 +129,7 @@
     <string name="no_blocked_numbers">Henüz engellenen numara yok</string>
     <string name="cd_remove_blocked_number">Engeli kaldır</string>
     <string name="cd_add_blocked_number">Numara engelle</string>
+    <string name="block_sender">Numarayı engelle</string>
+    <string name="sender_blocked">Numara engellendi</string>
+    <string name="cd_block_sender">Numarayı engelle</string>
 </resources>

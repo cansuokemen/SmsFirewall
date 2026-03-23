@@ -31,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.smsfirewall.R
 import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.ui.theme.ThemeMode
+import com.example.smsfirewall.util.normalizeSender
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,7 +49,15 @@ fun BlockedSmsScreen(
     val unreadIds = systemResult.unreadIds
     val spamMessages by viewModel.repository.getByStatus(SmsStatus.BLOCK).collectAsState(initial = emptyList())
 
-    val visibleMessages = if (viewModel.selectedTab == InboxTab.MESSAGES) regularMessages else spamMessages
+    val blockedSenders = viewModel.blockedSenders
+    val filteredRegularMessages = remember(regularMessages, blockedSenders) {
+        if (blockedSenders.isEmpty()) regularMessages
+        else regularMessages.filter { msg ->
+            val normalized = normalizeSender(msg.sender)
+            blockedSenders.none { normalizeSender(it) == normalized }
+        }
+    }
+    val visibleMessages = if (viewModel.selectedTab == InboxTab.MESSAGES) filteredRegularMessages else spamMessages
     val currentUnreadIds = if (viewModel.selectedTab == InboxTab.MESSAGES) unreadIds else emptySet()
     val unknownSenderLabel = stringResource(R.string.unknown_sender)
 
@@ -253,6 +262,11 @@ fun BlockedSmsScreen(
         },
         onDelete = { sms ->
             viewModel.deleteSingleMessage(sms)
+        },
+        onBlockSender = { sms ->
+            viewModel.addBlockedSender(sms.sender)
+            Toast.makeText(context, context.getString(R.string.sender_blocked), Toast.LENGTH_SHORT).show()
+            viewModel.selectedForDelete = null
         }
     )
 
