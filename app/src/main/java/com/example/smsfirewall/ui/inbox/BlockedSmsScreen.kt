@@ -50,6 +50,8 @@ fun BlockedSmsScreen(
     val spamMessages by viewModel.repository.getByStatus(SmsStatus.BLOCK).collectAsState(initial = emptyList())
 
     val blockedSenders = viewModel.blockedSenders
+
+    // Mesajlar sekmesi: engellenen göndericilerin mesajlarını gizle
     val filteredRegularMessages = remember(regularMessages, blockedSenders) {
         if (blockedSenders.isEmpty()) regularMessages
         else regularMessages.filter { msg ->
@@ -57,7 +59,17 @@ fun BlockedSmsScreen(
             blockedSenders.none { normalizeSender(it) == normalized }
         }
     }
-    val visibleMessages = if (viewModel.selectedTab == InboxTab.MESSAGES) filteredRegularMessages else spamMessages
+
+    // Spam sekmesi: engellenen göndericilerin mesajlarını gizle (sadece keyword spam görünsün)
+    val filteredSpamMessages = remember(spamMessages, blockedSenders) {
+        if (blockedSenders.isEmpty()) spamMessages
+        else spamMessages.filter { msg ->
+            val normalized = normalizeSender(msg.sender)
+            blockedSenders.none { normalizeSender(it) == normalized }
+        }
+    }
+
+    val visibleMessages = if (viewModel.selectedTab == InboxTab.MESSAGES) filteredRegularMessages else filteredSpamMessages
     val currentUnreadIds = if (viewModel.selectedTab == InboxTab.MESSAGES) unreadIds else emptySet()
     val unknownSenderLabel = stringResource(R.string.unknown_sender)
 

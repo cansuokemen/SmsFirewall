@@ -1,6 +1,7 @@
 package com.example.smsfirewall.filter
 
 import android.content.Context
+import com.example.smsfirewall.util.normalizeSender
 import java.util.Locale
 
 /**
@@ -49,22 +50,24 @@ class FilterKeywordStore(context: Context) {
     }
 
     fun addBlockedSender(sender: String) {
-        val normalized = sender.trim().lowercase(Locale.ROOT)
+        val normalized = normalizeSender(sender)
         if (normalized.isBlank()) return
 
         val current = getBlockedSenders().toMutableSet()
-        current.add(normalized)
-        prefs.edit()
-            .putStringSet(KEY_BLOCKED_SENDERS, current)
-            .apply()
+        if (current.none { normalizeSender(it) == normalized }) {
+            current.add(normalized)
+            prefs.edit()
+                .putStringSet(KEY_BLOCKED_SENDERS, current)
+                .apply()
+        }
     }
 
     fun removeBlockedSender(sender: String) {
-        val normalized = sender.trim().lowercase(Locale.ROOT)
+        val normalized = normalizeSender(sender)
         if (normalized.isBlank()) return
 
         val current = getBlockedSenders().toMutableSet()
-        if (current.remove(normalized)) {
+        if (current.removeAll { normalizeSender(it) == normalized }) {
             prefs.edit()
                 .putStringSet(KEY_BLOCKED_SENDERS, current)
                 .apply()

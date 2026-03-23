@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.SmsStatus
+import com.example.smsfirewall.util.normalizeSender
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -84,6 +85,50 @@ internal suspend fun deleteSmsFromSystemProvider(context: Context, smsId: Long) 
             )
         }.onFailure { throwable ->
             Log.e(TAG, "Failed to delete SMS from provider, id=$smsId", throwable)
+        }
+    }
+}
+
+/**
+ * Engellenen gönderenden gelen tüm mesajları sistem SMS sağlayıcısından siler.
+ * normalizeSender ile karşılaştırma yaparak farklı formatlı numaraları da eşleştirir.
+ */
+internal suspend fun deleteSystemSmsBySender(context: Context, sender: String) {
+    val normalizedTarget = normalizeSender(sender)
+    if (normalizedTarget.isBlank()) return
+
+    withContext(Dispatchers.IO) {
+        runCatching {
+            val projection = arrayOf("_id", "address")
+            val idsToDelete = mutableListOf<Long>()
+
+            context.contentResolver.query(
+                Telephony.Sms.CONTENT_URI,
+                projection,
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow("_id")
+                val addressColumn = cursor.getColumnIndexOrThrow("address")
+
+                while (cursor.moveToNext()) {
+                    val address = cursor.getString(addressColumn).orEmpty()
+                    if (normalizeSender(address) == normalizedTarget) {
+                        idsToDelete.add(cursor.getLong(idColumn))
+                    }
+                }
+            }
+
+            idsToDelete.forEach { smsId ->
+                context.contentResolver.delete(
+                    Telephony.Sms.CONTENT_URI,
+                    "_id = ?",
+                    arrayOf(smsId.toString())
+                )
+            }
+        }.onFailure { throwable ->
+            Log.e(TAG, "Failed to delete system SMS by sender: $sender", throwable)
         }
     }
 }

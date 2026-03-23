@@ -24,6 +24,7 @@ import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationConstants
 import com.example.smsfirewall.notifications.NotificationPreferenceStore
+import com.example.smsfirewall.util.normalizeSender
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -454,17 +455,29 @@ class InboxViewModel @Inject constructor(
     // --- Engellenen numara aksiyonları ---
 
     fun addBlockedSender(sender: String): Boolean {
-        val normalized = sender.trim().lowercase(java.util.Locale.ROOT)
+        val normalized = normalizeSender(sender)
         if (normalized.isBlank()) return false
-        if (blockedSenders.contains(normalized)) return false
+        if (blockedSenders.any { normalizeSender(it) == normalized }) return false
         filterKeywordStore.addBlockedSender(sender)
         blockedSenders = filterKeywordStore.getBlockedSenders()
+        // Sistem inbox mesajları silinmez — UI filtreleme ile gizlenir.
+        // Engel kaldırıldığında otomatik geri gelir.
         return true
     }
 
     fun removeBlockedSender(sender: String) {
         filterKeywordStore.removeBlockedSender(sender)
         blockedSenders = filterKeywordStore.getBlockedSenders()
+        // Engel kaldırıldığında Room DB'deki mesajları sistem inbox'a taşı
+        val normalized = normalizeSender(sender)
+        viewModelScope.launch {
+            val allBlocked = repository.getAllByStatus(SmsStatus.BLOCK)
+            val toRestore = allBlocked.filter { normalizeSender(it.sender) == normalized }
+            for (sms in toRestore) {
+                moveSpamToSystemInbox(context, repository, sms)
+            }
+            refreshSystemMessages()
+        }
     }
 }
 

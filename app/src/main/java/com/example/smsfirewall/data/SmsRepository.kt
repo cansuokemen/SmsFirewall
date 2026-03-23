@@ -30,6 +30,10 @@ class SmsRepository @Inject constructor(
         return smsDao.deleteByStatusBefore(status, beforeTimestamp)
     }
 
+    suspend fun getAllByStatus(status: String): List<SmsEntity> {
+        return smsDao.getAllByStatus(status)
+    }
+
     suspend fun delete(sms: SmsEntity) {
         smsDao.delete(sms)
     }

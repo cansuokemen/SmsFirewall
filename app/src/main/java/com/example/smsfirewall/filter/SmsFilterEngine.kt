@@ -1,5 +1,6 @@
 package com.example.smsfirewall.filter
 
+import com.example.smsfirewall.util.normalizeSender
 import java.util.Locale
 
 data class FilterDecision(
@@ -18,10 +19,12 @@ class SmsFilterEngine(
     private val blockedKeywords: Set<String> = emptySet()
 ) {
     fun evaluate(sender: String, body: String): FilterDecision {
-        val normalizedSender = sender.trim().lowercase(Locale.ROOT)
+        val normalizedSender = normalizeSender(sender)
         val normalizedBody = body.lowercase(Locale.ROOT)
 
-        if (normalizedSender.isNotEmpty() && blockedSenders.contains(normalizedSender)) {
+        if (normalizedSender.isNotEmpty() &&
+            blockedSenders.any { normalizeSender(it) == normalizedSender }
+        ) {
             return FilterDecision(
                 status = SmsStatus.BLOCK,
                 reason = "Blocked sender"
