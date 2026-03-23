@@ -51,7 +51,7 @@ internal fun NotificationWarningCard(onOpenSettings: () -> Unit) {
 }
 
 @Composable
-internal fun SpamAutoDeleteWarningCard() {
+internal fun SpamAutoDeleteWarningCard(retentionDays: Int = 30) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -71,7 +71,7 @@ internal fun SpamAutoDeleteWarningCard() {
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = stringResource(R.string.spam_auto_delete_warning),
+                text = stringResource(R.string.spam_auto_delete_warning_dynamic, retentionDays),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )

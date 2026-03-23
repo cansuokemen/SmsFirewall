@@ -1,6 +1,7 @@
 package com.example.smsfirewall.di
 
 import android.content.Context
+import com.example.smsfirewall.data.SpamRetentionPreferenceStore
 import com.example.smsfirewall.filter.FilterKeywordStore
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.ui.theme.ThemePreferenceStore
@@ -31,5 +32,11 @@ object AppModule {
     @Singleton
     fun provideThemePreferenceStore(@ApplicationContext context: Context): ThemePreferenceStore {
         return ThemePreferenceStore(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSpamRetentionPreferenceStore(@ApplicationContext context: Context): SpamRetentionPreferenceStore {
+        return SpamRetentionPreferenceStore(context)
     }
 }

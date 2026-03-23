@@ -16,7 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.smsfirewall.data.SpamRetentionPolicy
+import com.example.smsfirewall.data.SpamRetentionPreferenceStore
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.FilterKeywordStore
@@ -49,7 +49,8 @@ class InboxViewModel @Inject constructor(
     application: Application,
     val repository: SmsRepository,
     val mutedSenderStore: MutedSenderStore,
-    val filterKeywordStore: FilterKeywordStore
+    val filterKeywordStore: FilterKeywordStore,
+    val spamRetentionStore: SpamRetentionPreferenceStore
 ) : AndroidViewModel(application) {
 
     private val context get() = getApplication<Application>()
@@ -138,6 +139,15 @@ class InboxViewModel @Inject constructor(
     var blockedSenders by mutableStateOf(filterKeywordStore.getBlockedSenders())
         private set
 
+    // --- Spam saklama süresi ---
+    var spamRetentionDays by mutableStateOf(spamRetentionStore.getRetentionDays())
+        private set
+
+    fun setSpamRetention(days: Int) {
+        spamRetentionStore.setRetentionDays(days)
+        spamRetentionDays = days
+    }
+
     // --- Kişi adı cache ---
     val contactNameCache = mutableStateMapOf<String, String?>()
     private val pendingLookups = mutableSetOf<String>()
@@ -207,7 +217,7 @@ class InboxViewModel @Inject constructor(
             viewModelScope.launch {
                 repository.deleteByStatusBefore(
                     status = SmsStatus.BLOCK,
-                    beforeTimestamp = SpamRetentionPolicy.cutoffTimestamp()
+                    beforeTimestamp = spamRetentionStore.cutoffTimestamp()
                 )
             }
         }

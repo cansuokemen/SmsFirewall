@@ -15,7 +15,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.example.smsfirewall.data.SpamRetentionPolicy
+import com.example.smsfirewall.data.SpamRetentionPreferenceStore
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.FilterKeywordStore
@@ -36,6 +36,7 @@ class SmsReceiver : BroadcastReceiver() {
     @Inject lateinit var repository: SmsRepository
     @Inject lateinit var filterKeywordStore: FilterKeywordStore
     @Inject lateinit var mutedSenderStore: MutedSenderStore
+    @Inject lateinit var spamRetentionStore: SpamRetentionPreferenceStore
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
@@ -82,7 +83,7 @@ class SmsReceiver : BroadcastReceiver() {
 
                 repository.deleteByStatusBefore(
                     status = SmsStatus.BLOCK,
-                    beforeTimestamp = SpamRetentionPolicy.cutoffTimestamp()
+                    beforeTimestamp = spamRetentionStore.cutoffTimestamp()
                 )
 
                 if (decision.status != SmsStatus.BLOCK && !mutedSenderStore.isMuted(sender)) {

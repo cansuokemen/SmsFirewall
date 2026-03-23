@@ -55,6 +55,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
+import com.example.smsfirewall.data.SpamRetentionPreferenceStore
 import com.example.smsfirewall.ui.theme.ThemeMode
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,6 +66,8 @@ fun SettingsScreen(
     blockedSenders: Set<String>,
     onAddBlockedSender: (String) -> Boolean,
     onRemoveBlockedSender: (String) -> Unit,
+    spamRetentionDays: Int,
+    onSpamRetentionChanged: (Int) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -138,6 +141,45 @@ fun SettingsScreen(
                             selected = currentThemeMode == ThemeMode.DARK,
                             onClick = { onThemeModeChanged(ThemeMode.DARK) }
                         )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
+            // --- Spam saklama süresi bölümü ---
+            item {
+                Text(
+                    text = stringResource(R.string.spam_retention),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = stringResource(R.string.spam_retention_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.selectableGroup()) {
+                        SpamRetentionPreferenceStore.RETENTION_OPTIONS.forEach { days ->
+                            RetentionOption(
+                                label = stringResource(R.string.spam_retention_days, days),
+                                selected = spamRetentionDays == days,
+                                onClick = { onSpamRetentionChanged(days) }
+                            )
+                        }
                     }
                 }
 
@@ -317,6 +359,36 @@ private fun BlockedSenderItem(
             }
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    )
+}
+
+@Composable
+private fun RetentionOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    ListItem(
+        headlineContent = {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        },
+        trailingContent = {
+            RadioButton(
+                selected = selected,
+                onClick = null
+            )
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(
+                selected = selected,
+                onClick = onClick,
+                role = Role.RadioButton
+            )
     )
 }
 

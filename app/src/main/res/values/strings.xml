@@ -136,4 +136,10 @@
     <string name="block_confirm_message">%s numarasını engellemek istediğinizden emin misiniz?\n\nBu numaradan gelen tüm mesajlar ve aramalar engellenecektir.</string>
     <string name="block_confirm_message_multiple">Seçili %d numarayı engellemek istediğinizden emin misiniz?\n\nBu numaralardan gelen tüm mesajlar ve aramalar engellenecektir.</string>
     <string name="block">Engelle</string>
+
+    <!-- Spam retention settings -->
+    <string name="spam_retention">Spam Saklama Süresi</string>
+    <string name="spam_retention_description">Spam mesajların otomatik silinmeden önce saklanacağı süreyi belirleyin</string>
+    <string name="spam_retention_days">%d gün</string>
+    <string name="spam_auto_delete_warning_dynamic">Spam mesajlar %d gün sonra otomatik olarak silinecektir.</string>
 </resources>

@@ -232,6 +232,8 @@ fun BlockedSmsScreen(
                         blockedSenders = viewModel.blockedSenders,
                         onAddBlockedSender = { sender -> viewModel.addBlockedSender(sender) },
                         onRemoveBlockedSender = { sender -> viewModel.removeBlockedSender(sender) },
+                        spamRetentionDays = viewModel.spamRetentionDays,
+                        onSpamRetentionChanged = { days -> viewModel.setSpamRetention(days) },
                         onBack = { viewModel.closeSettings() },
                         modifier = Modifier.fillMaxSize()
                     )

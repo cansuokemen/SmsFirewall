@@ -149,7 +149,7 @@ internal fun ConversationListContent(
             }
 
             if (viewModel.selectedTab == InboxTab.SPAM) {
-                SpamAutoDeleteWarningCard()
+                SpamAutoDeleteWarningCard(retentionDays = viewModel.spamRetentionDays)
             }
 
             PullToRefreshBox(
