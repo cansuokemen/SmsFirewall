@@ -220,6 +220,9 @@ fun BlockedSmsScreen(
                     SettingsScreen(
                         currentThemeMode = currentThemeMode,
                         onThemeModeChanged = onThemeModeChanged,
+                        blockedSenders = viewModel.blockedSenders,
+                        onAddBlockedSender = { sender -> viewModel.addBlockedSender(sender) },
+                        onRemoveBlockedSender = { sender -> viewModel.removeBlockedSender(sender) },
                         onBack = { viewModel.closeSettings() },
                         modifier = Modifier.fillMaxSize()
                     )

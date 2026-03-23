@@ -116,4 +116,17 @@
     <!-- Filter settings -->
     <string name="filter_prefs_name">sms_filter_settings</string>
     <string name="filter_keywords_key">blocked_keywords</string>
+
+    <!-- Blocked numbers settings -->
+    <string name="blocked_numbers">Engellenen Numaralar</string>
+    <string name="blocked_numbers_description">Engellenen numaralardan gelen mesajlar spam olarak işaretlenir</string>
+    <string name="add_blocked_number">Numara ekle</string>
+    <string name="add_blocked_number_hint">Telefon numarası veya gönderici adı</string>
+    <string name="blocked_number_added">Numara engellendi</string>
+    <string name="blocked_number_removed">Engel kaldırıldı</string>
+    <string name="blocked_number_empty">Numara boş olamaz</string>
+    <string name="blocked_number_exists">Bu numara zaten engellenmiş</string>
+    <string name="no_blocked_numbers">Henüz engellenen numara yok</string>
+    <string name="cd_remove_blocked_number">Engeli kaldır</string>
+    <string name="cd_add_blocked_number">Numara engelle</string>
 </resources>

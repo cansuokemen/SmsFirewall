@@ -19,6 +19,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.smsfirewall.data.SpamRetentionPolicy
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.local.SmsEntity
+import com.example.smsfirewall.filter.FilterKeywordStore
 import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationConstants
@@ -47,7 +48,8 @@ sealed interface UiEvent {
 class InboxViewModel @Inject constructor(
     application: Application,
     val repository: SmsRepository,
-    val mutedSenderStore: MutedSenderStore
+    val mutedSenderStore: MutedSenderStore,
+    val filterKeywordStore: FilterKeywordStore
 ) : AndroidViewModel(application) {
 
     private val context get() = getApplication<Application>()
@@ -128,6 +130,10 @@ class InboxViewModel @Inject constructor(
 
     // --- MutedSenderStore ---
     var mutedSendersChangeToken by mutableIntStateOf(0)
+        private set
+
+    // --- Engellenen numaralar ---
+    var blockedSenders by mutableStateOf(filterKeywordStore.getBlockedSenders())
         private set
 
     // --- Kişi adı cache ---
@@ -388,6 +394,22 @@ class InboxViewModel @Inject constructor(
         viewModelScope.launch {
             markConversationAsRead(context, conversation, unreadIds)
         }
+    }
+
+    // --- Engellenen numara aksiyonları ---
+
+    fun addBlockedSender(sender: String): Boolean {
+        val normalized = sender.trim().lowercase(java.util.Locale.ROOT)
+        if (normalized.isBlank()) return false
+        if (blockedSenders.contains(normalized)) return false
+        filterKeywordStore.addBlockedSender(sender)
+        blockedSenders = filterKeywordStore.getBlockedSenders()
+        return true
+    }
+
+    fun removeBlockedSender(sender: String) {
+        filterKeywordStore.removeBlockedSender(sender)
+        blockedSenders = filterKeywordStore.getBlockedSenders()
     }
 }
 
