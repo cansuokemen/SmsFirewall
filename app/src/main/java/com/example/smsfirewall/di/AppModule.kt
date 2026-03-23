@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.smsfirewall.data.SpamRetentionPreferenceStore
 import com.example.smsfirewall.filter.FilterKeywordStore
 import com.example.smsfirewall.notifications.MutedSenderStore
+import com.example.smsfirewall.notifications.NotificationPreferenceStore
 import com.example.smsfirewall.ui.theme.ThemePreferenceStore
 import dagger.Module
 import dagger.Provides
@@ -38,5 +39,11 @@ object AppModule {
     @Singleton
     fun provideSpamRetentionPreferenceStore(@ApplicationContext context: Context): SpamRetentionPreferenceStore {
         return SpamRetentionPreferenceStore(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideNotificationPreferenceStore(@ApplicationContext context: Context): NotificationPreferenceStore {
+        return NotificationPreferenceStore(context)
     }
 }

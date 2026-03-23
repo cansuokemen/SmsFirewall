@@ -234,6 +234,16 @@ fun BlockedSmsScreen(
                         onRemoveBlockedSender = { sender -> viewModel.removeBlockedSender(sender) },
                         spamRetentionDays = viewModel.spamRetentionDays,
                         onSpamRetentionChanged = { days -> viewModel.setSpamRetention(days) },
+                        soundEnabled = viewModel.notifSoundEnabled,
+                        onSoundChanged = { viewModel.setNotifSound(it) },
+                        vibrationEnabled = viewModel.notifVibrationEnabled,
+                        onVibrationChanged = { viewModel.setNotifVibration(it) },
+                        quietHoursEnabled = viewModel.notifQuietHoursEnabled,
+                        onQuietHoursChanged = { viewModel.setNotifQuietHours(it) },
+                        quietHoursStart = viewModel.notifQuietStart,
+                        onQuietHoursStartChanged = { h, m -> viewModel.setNotifQuietStart(h, m) },
+                        quietHoursEnd = viewModel.notifQuietEnd,
+                        onQuietHoursEndChanged = { h, m -> viewModel.setNotifQuietEnd(h, m) },
                         onBack = { viewModel.closeSettings() },
                         modifier = Modifier.fillMaxSize()
                     )

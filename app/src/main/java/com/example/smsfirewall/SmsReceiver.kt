@@ -23,6 +23,7 @@ import com.example.smsfirewall.filter.SmsFilterEngine
 import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationConstants
+import com.example.smsfirewall.notifications.NotificationPreferenceStore
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +38,7 @@ class SmsReceiver : BroadcastReceiver() {
     @Inject lateinit var filterKeywordStore: FilterKeywordStore
     @Inject lateinit var mutedSenderStore: MutedSenderStore
     @Inject lateinit var spamRetentionStore: SpamRetentionPreferenceStore
+    @Inject lateinit var notificationPreferenceStore: NotificationPreferenceStore
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
@@ -117,6 +119,11 @@ class SmsReceiver : BroadcastReceiver() {
     }
 
     private fun showAllowedSmsNotification(context: Context, sender: String, body: String) {
+        // Sessiz saatler kontrolü — sessiz saatlerdeyse bildirim gösterme
+        if (notificationPreferenceStore.isCurrentlyInQuietHours()) {
+            return
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(
                 context,
@@ -132,7 +139,12 @@ class SmsReceiver : BroadcastReceiver() {
                 NotificationConstants.ALLOWED_SMS_CHANNEL_ID,
                 context.getString(R.string.notification_channel_name),
                 NotificationManager.IMPORTANCE_DEFAULT
-            )
+            ).apply {
+                enableVibration(notificationPreferenceStore.isVibrationEnabled())
+                if (!notificationPreferenceStore.isSoundEnabled()) {
+                    setSound(null, null)
+                }
+            }
             manager.createNotificationChannel(channel)
         }
 
@@ -146,17 +158,37 @@ class SmsReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(context, NotificationConstants.ALLOWED_SMS_CHANNEL_ID)
+        val soundEnabled = notificationPreferenceStore.isSoundEnabled()
+        val vibrationEnabled = notificationPreferenceStore.isVibrationEnabled()
+
+        val builder = NotificationCompat.Builder(context, NotificationConstants.ALLOWED_SMS_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_email)
             .setContentTitle(sender.ifBlank { context.getString(R.string.notification_unknown_sender) })
             .setContentText(body.ifBlank { context.getString(R.string.notification_new_sms) })
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
-            .build()
 
-        NotificationManagerCompat.from(context).notify(System.currentTimeMillis().toInt(), notification)
+        // Ses ve titreşim ayarları (Android 7 ve altı için — Android 8+ kanal üzerinden yönetilir)
+        if (!soundEnabled && !vibrationEnabled) {
+            builder.setPriority(NotificationCompat.PRIORITY_LOW)
+            builder.setDefaults(0)
+            builder.setSound(null)
+            builder.setVibrate(null)
+        } else if (!soundEnabled) {
+            builder.setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            builder.setDefaults(NotificationCompat.DEFAULT_VIBRATE)
+            builder.setSound(null)
+        } else if (!vibrationEnabled) {
+            builder.setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            builder.setDefaults(NotificationCompat.DEFAULT_SOUND)
+            builder.setVibrate(null)
+        } else {
+            builder.setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            builder.setDefaults(NotificationCompat.DEFAULT_ALL)
+        }
+
+        NotificationManagerCompat.from(context).notify(System.currentTimeMillis().toInt(), builder.build())
     }
 
     private companion object {

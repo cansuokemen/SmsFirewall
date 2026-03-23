@@ -23,6 +23,7 @@ import com.example.smsfirewall.filter.FilterKeywordStore
 import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationConstants
+import com.example.smsfirewall.notifications.NotificationPreferenceStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -50,7 +51,8 @@ class InboxViewModel @Inject constructor(
     val repository: SmsRepository,
     val mutedSenderStore: MutedSenderStore,
     val filterKeywordStore: FilterKeywordStore,
-    val spamRetentionStore: SpamRetentionPreferenceStore
+    val spamRetentionStore: SpamRetentionPreferenceStore,
+    val notificationPreferenceStore: NotificationPreferenceStore
 ) : AndroidViewModel(application) {
 
     private val context get() = getApplication<Application>()
@@ -146,6 +148,47 @@ class InboxViewModel @Inject constructor(
     fun setSpamRetention(days: Int) {
         spamRetentionStore.setRetentionDays(days)
         spamRetentionDays = days
+    }
+
+    // --- Bildirim tercihleri ---
+    var notifSoundEnabled by mutableStateOf(notificationPreferenceStore.isSoundEnabled())
+        private set
+
+    var notifVibrationEnabled by mutableStateOf(notificationPreferenceStore.isVibrationEnabled())
+        private set
+
+    var notifQuietHoursEnabled by mutableStateOf(notificationPreferenceStore.isQuietHoursEnabled())
+        private set
+
+    var notifQuietStart by mutableStateOf(notificationPreferenceStore.getQuietHoursStart())
+        private set
+
+    var notifQuietEnd by mutableStateOf(notificationPreferenceStore.getQuietHoursEnd())
+        private set
+
+    fun setNotifSound(enabled: Boolean) {
+        notificationPreferenceStore.setSoundEnabled(enabled)
+        notifSoundEnabled = enabled
+    }
+
+    fun setNotifVibration(enabled: Boolean) {
+        notificationPreferenceStore.setVibrationEnabled(enabled)
+        notifVibrationEnabled = enabled
+    }
+
+    fun setNotifQuietHours(enabled: Boolean) {
+        notificationPreferenceStore.setQuietHoursEnabled(enabled)
+        notifQuietHoursEnabled = enabled
+    }
+
+    fun setNotifQuietStart(hour: Int, minute: Int) {
+        notificationPreferenceStore.setQuietHoursStart(hour, minute)
+        notifQuietStart = hour to minute
+    }
+
+    fun setNotifQuietEnd(hour: Int, minute: Int) {
+        notificationPreferenceStore.setQuietHoursEnd(hour, minute)
+        notifQuietEnd = hour to minute
     }
 
     // --- Kişi adı cache ---

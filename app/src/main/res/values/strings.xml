@@ -137,6 +137,19 @@
     <string name="block_confirm_message_multiple">Seçili %d numarayı engellemek istediğinizden emin misiniz?\n\nBu numaralardan gelen tüm mesajlar ve aramalar engellenecektir.</string>
     <string name="block">Engelle</string>
 
+    <!-- Notification preferences -->
+    <string name="notification_preferences">Bildirim Tercihleri</string>
+    <string name="notification_preferences_description">Bildirim ses, titreşim ve sessiz saat ayarlarını yönetin</string>
+    <string name="notification_sound">Ses</string>
+    <string name="notification_sound_description">Bildirim geldiğinde ses çal</string>
+    <string name="notification_vibration">Titreşim</string>
+    <string name="notification_vibration_description">Bildirim geldiğinde titreşim ver</string>
+    <string name="notification_quiet_hours">Sessiz Saatler</string>
+    <string name="notification_quiet_hours_description">Belirlenen saatler arasında bildirim gösterme</string>
+    <string name="quiet_hours_start">Başlangıç</string>
+    <string name="quiet_hours_end">Bitiş</string>
+    <string name="quiet_hours_range">%1$s – %2$s</string>
+
     <!-- Spam retention settings -->
     <string name="spam_retention">Spam Saklama Süresi</string>
     <string name="spam_retention_description">Spam mesajların otomatik silinmeden önce saklanacağı süreyi belirleyin</string>

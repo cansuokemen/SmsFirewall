@@ -1,7 +1,10 @@
 package com.example.smsfirewall.ui.inbox
 
+import android.app.TimePickerDialog
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,11 +26,17 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.SettingsBrightness
+import androidx.compose.material.icons.outlined.Vibration
+import androidx.compose.material.icons.outlined.VolumeOff
+import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -37,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -68,6 +77,16 @@ fun SettingsScreen(
     onRemoveBlockedSender: (String) -> Unit,
     spamRetentionDays: Int,
     onSpamRetentionChanged: (Int) -> Unit,
+    soundEnabled: Boolean,
+    onSoundChanged: (Boolean) -> Unit,
+    vibrationEnabled: Boolean,
+    onVibrationChanged: (Boolean) -> Unit,
+    quietHoursEnabled: Boolean,
+    onQuietHoursChanged: (Boolean) -> Unit,
+    quietHoursStart: Pair<Int, Int>,
+    onQuietHoursStartChanged: (Int, Int) -> Unit,
+    quietHoursEnd: Pair<Int, Int>,
+    onQuietHoursEndChanged: (Int, Int) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -98,23 +117,10 @@ fun SettingsScreen(
             // --- Tema bölümü ---
             item {
                 Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = stringResource(R.string.theme),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                SectionHeader(
+                    title = stringResource(R.string.theme),
+                    description = stringResource(R.string.theme_description)
                 )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = stringResource(R.string.theme_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
@@ -143,28 +149,96 @@ fun SettingsScreen(
                         )
                     }
                 }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
 
+            // --- Bildirim tercihleri bölümü ---
+            item {
+                SectionHeader(
+                    title = stringResource(R.string.notification_preferences),
+                    description = stringResource(R.string.notification_preferences_description)
+                )
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column {
+                        // Ses
+                        SwitchSettingItem(
+                            icon = if (soundEnabled) Icons.Outlined.VolumeUp else Icons.Outlined.VolumeOff,
+                            title = stringResource(R.string.notification_sound),
+                            subtitle = stringResource(R.string.notification_sound_description),
+                            checked = soundEnabled,
+                            onCheckedChange = onSoundChanged
+                        )
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+
+                        // Titreşim
+                        SwitchSettingItem(
+                            icon = Icons.Outlined.Vibration,
+                            title = stringResource(R.string.notification_vibration),
+                            subtitle = stringResource(R.string.notification_vibration_description),
+                            checked = vibrationEnabled,
+                            onCheckedChange = onVibrationChanged
+                        )
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+
+                        // Sessiz Saatler
+                        SwitchSettingItem(
+                            icon = if (quietHoursEnabled) Icons.Outlined.NotificationsOff else Icons.Outlined.Notifications,
+                            title = stringResource(R.string.notification_quiet_hours),
+                            subtitle = stringResource(R.string.notification_quiet_hours_description),
+                            checked = quietHoursEnabled,
+                            onCheckedChange = onQuietHoursChanged
+                        )
+
+                        // Sessiz saatler açıksa zaman seçicileri göster
+                        AnimatedVisibility(visible = quietHoursEnabled) {
+                            Column {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                )
+                                QuietHoursTimePicker(
+                                    label = stringResource(R.string.quiet_hours_start),
+                                    hour = quietHoursStart.first,
+                                    minute = quietHoursStart.second,
+                                    onTimeSelected = onQuietHoursStartChanged
+                                )
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                )
+                                QuietHoursTimePicker(
+                                    label = stringResource(R.string.quiet_hours_end),
+                                    hour = quietHoursEnd.first,
+                                    minute = quietHoursEnd.second,
+                                    onTimeSelected = onQuietHoursEndChanged
+                                )
+                            }
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
             // --- Spam saklama süresi bölümü ---
             item {
-                Text(
-                    text = stringResource(R.string.spam_retention),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                SectionHeader(
+                    title = stringResource(R.string.spam_retention),
+                    description = stringResource(R.string.spam_retention_description)
                 )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = stringResource(R.string.spam_retention_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
@@ -182,28 +256,15 @@ fun SettingsScreen(
                         }
                     }
                 }
-
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
             // --- Engellenen numaralar bölümü ---
             item {
-                Text(
-                    text = stringResource(R.string.blocked_numbers),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                SectionHeader(
+                    title = stringResource(R.string.blocked_numbers),
+                    description = stringResource(R.string.blocked_numbers_description)
                 )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = stringResource(R.string.blocked_numbers_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
                 BlockedSenderInput(
                     onAdd = { sender ->
                         val added = onAddBlockedSender(sender)
@@ -215,7 +276,6 @@ fun SettingsScreen(
                         added
                     }
                 )
-
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
@@ -283,6 +343,102 @@ fun SettingsScreen(
     }
 }
 
+// --- Helper Composables ---
+
+@Composable
+private fun SectionHeader(title: String, description: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    Text(
+        text = description,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Spacer(modifier = Modifier.height(12.dp))
+}
+
+@Composable
+private fun SwitchSettingItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    ListItem(
+        headlineContent = {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+        },
+        supportingContent = {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        leadingContent = {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (checked) MaterialTheme.colorScheme.primary
+                       else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        trailingContent = {
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange
+            )
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+    )
+}
+
+@Composable
+private fun QuietHoursTimePicker(
+    label: String,
+    hour: Int,
+    minute: Int,
+    onTimeSelected: (Int, Int) -> Unit
+) {
+    val context = LocalContext.current
+    val timeText = String.format("%02d:%02d", hour, minute)
+
+    ListItem(
+        headlineContent = {
+            Text(text = label, style = MaterialTheme.typography.bodyLarge)
+        },
+        trailingContent = {
+            Text(
+                text = timeText,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                TimePickerDialog(
+                    context,
+                    { _, selectedHour, selectedMinute ->
+                        onTimeSelected(selectedHour, selectedMinute)
+                    },
+                    hour,
+                    minute,
+                    true // 24-saat formatı
+                ).show()
+            }
+    )
+}
+
 @Composable
 private fun BlockedSenderInput(
     onAdd: (String) -> Boolean
@@ -337,10 +493,7 @@ private fun BlockedSenderItem(
 ) {
     ListItem(
         headlineContent = {
-            Text(
-                text = sender,
-                style = MaterialTheme.typography.bodyLarge
-            )
+            Text(text = sender, style = MaterialTheme.typography.bodyLarge)
         },
         leadingContent = {
             Icon(
@@ -370,16 +523,10 @@ private fun RetentionOption(
 ) {
     ListItem(
         headlineContent = {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge
-            )
+            Text(text = label, style = MaterialTheme.typography.bodyLarge)
         },
         trailingContent = {
-            RadioButton(
-                selected = selected,
-                onClick = null
-            )
+            RadioButton(selected = selected, onClick = null)
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier
@@ -401,10 +548,7 @@ private fun ThemeOption(
 ) {
     ListItem(
         headlineContent = {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge
-            )
+            Text(text = label, style = MaterialTheme.typography.bodyLarge)
         },
         leadingContent = {
             Icon(
@@ -415,10 +559,7 @@ private fun ThemeOption(
             )
         },
         trailingContent = {
-            RadioButton(
-                selected = selected,
-                onClick = null
-            )
+            RadioButton(selected = selected, onClick = null)
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier
