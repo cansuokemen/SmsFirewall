@@ -15,7 +15,6 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.example.smsfirewall.data.DatabaseProvider
 import com.example.smsfirewall.data.SpamRetentionPolicy
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.local.SmsEntity
@@ -24,12 +23,20 @@ import com.example.smsfirewall.filter.SmsFilterEngine
 import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationConstants
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class SmsReceiver : BroadcastReceiver() {
+
+    @Inject lateinit var repository: SmsRepository
+    @Inject lateinit var filterKeywordStore: FilterKeywordStore
+    @Inject lateinit var mutedSenderStore: MutedSenderStore
+
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
         if (action != Telephony.Sms.Intents.SMS_DELIVER_ACTION) {
@@ -45,17 +52,15 @@ class SmsReceiver : BroadcastReceiver() {
         }
         val receivedAt = messages.firstOrNull()?.timestampMillis ?: System.currentTimeMillis()
 
-        val filterStore = FilterKeywordStore(context)
         val filterEngine = SmsFilterEngine(
-            blockedSenders = filterStore.getBlockedSenders(),
-            blockedKeywords = filterStore.getBlockedKeywords()
+            blockedSenders = filterKeywordStore.getBlockedSenders(),
+            blockedKeywords = filterKeywordStore.getBlockedKeywords()
         )
         val decision = filterEngine.evaluate(sender = sender, body = body)
 
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                val repository = SmsRepository(DatabaseProvider.getDatabase(context).smsDao())
                 if (decision.status == SmsStatus.BLOCK) {
                     repository.insert(
                         SmsEntity(
@@ -80,7 +85,6 @@ class SmsReceiver : BroadcastReceiver() {
                     beforeTimestamp = SpamRetentionPolicy.cutoffTimestamp()
                 )
 
-                val mutedSenderStore = MutedSenderStore(context)
                 if (decision.status != SmsStatus.BLOCK && !mutedSenderStore.isMuted(sender)) {
                     showAllowedSmsNotification(context, sender, body)
                 }

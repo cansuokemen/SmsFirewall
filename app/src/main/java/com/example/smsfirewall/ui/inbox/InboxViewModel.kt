@@ -15,8 +15,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.smsfirewall.data.SpamRetentionPolicy
 import com.example.smsfirewall.data.SmsRepository
@@ -24,6 +22,7 @@ import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.SmsStatus
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationConstants
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -34,6 +33,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 
 enum class ScreenState {
     LIST, DETAIL, NEW_MESSAGE, SETTINGS
@@ -43,9 +43,11 @@ sealed interface UiEvent {
     data class ShowToast(val messageResId: Int) : UiEvent
 }
 
-class InboxViewModel(
+@HiltViewModel
+class InboxViewModel @Inject constructor(
     application: Application,
-    val repository: SmsRepository
+    val repository: SmsRepository,
+    val mutedSenderStore: MutedSenderStore
 ) : AndroidViewModel(application) {
 
     private val context get() = getApplication<Application>()
@@ -125,7 +127,6 @@ class InboxViewModel(
         private set
 
     // --- MutedSenderStore ---
-    val mutedSenderStore = MutedSenderStore(context)
     var mutedSendersChangeToken by mutableIntStateOf(0)
         private set
 
@@ -390,15 +391,3 @@ class InboxViewModel(
     }
 }
 
-class InboxViewModelFactory(
-    private val application: Application,
-    private val repository: SmsRepository
-) : ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(InboxViewModel::class.java)) {
-            return InboxViewModel(application, repository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-    }
-}

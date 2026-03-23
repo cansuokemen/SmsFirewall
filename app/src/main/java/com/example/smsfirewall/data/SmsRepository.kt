@@ -3,8 +3,11 @@ package com.example.smsfirewall.data
 import com.example.smsfirewall.data.local.SmsDao
 import com.example.smsfirewall.data.local.SmsEntity
 import kotlinx.coroutines.flow.Flow
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class SmsRepository(
+@Singleton
+class SmsRepository @Inject constructor(
     private val smsDao: SmsDao
 ) {
     suspend fun insert(sms: SmsEntity) {

@@ -11,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,24 +19,27 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import com.example.smsfirewall.data.DatabaseProvider
-import com.example.smsfirewall.data.SmsRepository
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModelProvider
 import com.example.smsfirewall.ui.inbox.BlockedSmsScreen
 import com.example.smsfirewall.ui.inbox.InboxViewModel
-import com.example.smsfirewall.ui.inbox.InboxViewModelFactory
 import com.example.smsfirewall.ui.theme.ThemePreferenceStore
 import com.example.smsfirewall.ui.theme.SmsFirewallTheme
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private var uiStarted = false
     private var requestInFlight = false
     private var requestAttempted = false
-    private lateinit var smsRepository: SmsRepository
+
+    private val inboxViewModel: InboxViewModel by viewModels()
+
+    @Inject
+    lateinit var themePreferenceStore: ThemePreferenceStore
 
     private val defaultSmsRequestLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -52,8 +56,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        smsRepository = SmsRepository(DatabaseProvider.getDatabase(this).smsDao())
         continueOnlyIfDefaultSms()
     }
 
@@ -126,11 +128,6 @@ class MainActivity : ComponentActivity() {
         if (uiStarted) return
         uiStarted = true
         enableEdgeToEdge()
-        val themePreferenceStore = ThemePreferenceStore(this)
-        val inboxViewModel = ViewModelProvider(
-            this,
-            InboxViewModelFactory(application, smsRepository)
-        )[InboxViewModel::class.java]
         setContent {
             var themeMode by remember { mutableStateOf(themePreferenceStore.getThemeMode()) }
             SmsFirewallTheme(themeMode = themeMode) {
