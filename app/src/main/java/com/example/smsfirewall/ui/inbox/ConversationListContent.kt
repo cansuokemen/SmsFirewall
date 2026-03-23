@@ -114,9 +114,8 @@ internal fun ConversationListContent(
                         val selectedSenders = filteredConversations
                             .filter { it.senderKey in viewModel.selectedConversationKeys }
                             .map { it.displaySender }
-                        selectedSenders.forEach { sender -> viewModel.addBlockedSender(sender) }
-                        viewModel.exitSelectionMode()
-                        Toast.makeText(context, context.getString(R.string.sender_blocked), Toast.LENGTH_SHORT).show()
+                        viewModel.pendingBlockSenders = selectedSenders
+                        viewModel.showBlockConfirm = true
                     },
                     onDelete = { viewModel.showBatchDeleteConfirm = true },
                     hasSelection = viewModel.selectedConversationKeys.isNotEmpty()
@@ -231,8 +230,8 @@ internal fun ConversationListContent(
                                     Toast.makeText(context, context.getString(R.string.notifications_unmuted), Toast.LENGTH_SHORT).show()
                                 },
                                 onBlockSender = {
-                                    viewModel.addBlockedSender(conversation.displaySender)
-                                    Toast.makeText(context, context.getString(R.string.sender_blocked), Toast.LENGTH_SHORT).show()
+                                    viewModel.pendingBlockSenders = listOf(conversation.displaySender)
+                                    viewModel.showBlockConfirm = true
                                 }
                             )
                             ConversationListItem(

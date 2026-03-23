@@ -132,4 +132,8 @@
     <string name="block_sender">Numarayı engelle</string>
     <string name="sender_blocked">Numara engellendi</string>
     <string name="cd_block_sender">Numarayı engelle</string>
+    <string name="block_confirm_title">Numarayı Engelle</string>
+    <string name="block_confirm_message">%s numarasını engellemek istediğinizden emin misiniz?\n\nBu numaradan gelen tüm mesajlar ve aramalar engellenecektir.</string>
+    <string name="block_confirm_message_multiple">Seçili %d numarayı engellemek istediğinizden emin misiniz?\n\nBu numaralardan gelen tüm mesajlar ve aramalar engellenecektir.</string>
+    <string name="block">Engelle</string>
 </resources>

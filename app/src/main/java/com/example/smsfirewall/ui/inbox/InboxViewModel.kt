@@ -102,6 +102,8 @@ class InboxViewModel @Inject constructor(
         private set
 
     var showBatchDeleteConfirm by mutableStateOf(false)
+    var showBlockConfirm by mutableStateOf(false)
+    var pendingBlockSenders by mutableStateOf(listOf<String>())
 
     // --- Diyalog ---
     var selectedForDelete by mutableStateOf<SmsEntity?>(null)

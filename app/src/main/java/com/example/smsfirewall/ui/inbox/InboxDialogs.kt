@@ -164,3 +164,38 @@ internal fun BatchDeleteConfirmDialog(
         }
     )
 }
+
+@Composable
+internal fun BlockSenderConfirmDialog(
+    show: Boolean,
+    senderNames: List<String>,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (!show) return
+
+    val message = if (senderNames.size == 1) {
+        stringResource(R.string.block_confirm_message, senderNames.first())
+    } else {
+        stringResource(R.string.block_confirm_message_multiple, senderNames.size)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.block_confirm_title)) },
+        text = { Text(text = message) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(
+                    text = stringResource(R.string.block),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.cancel))
+            }
+        }
+    )
+}

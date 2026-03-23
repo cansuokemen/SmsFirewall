@@ -264,8 +264,8 @@ fun BlockedSmsScreen(
             viewModel.deleteSingleMessage(sms)
         },
         onBlockSender = { sms ->
-            viewModel.addBlockedSender(sms.sender)
-            Toast.makeText(context, context.getString(R.string.sender_blocked), Toast.LENGTH_SHORT).show()
+            viewModel.pendingBlockSenders = listOf(sms.sender)
+            viewModel.showBlockConfirm = true
             viewModel.selectedForDelete = null
         }
     )
@@ -280,6 +280,22 @@ fun BlockedSmsScreen(
         count = viewModel.selectedConversationKeys.size,
         onConfirm = { viewModel.batchDeleteSelected(filteredConversations) },
         onDismiss = { viewModel.showBatchDeleteConfirm = false }
+    )
+
+    BlockSenderConfirmDialog(
+        show = viewModel.showBlockConfirm,
+        senderNames = viewModel.pendingBlockSenders,
+        onConfirm = {
+            viewModel.pendingBlockSenders.forEach { sender -> viewModel.addBlockedSender(sender) }
+            viewModel.showBlockConfirm = false
+            viewModel.pendingBlockSenders = emptyList()
+            viewModel.exitSelectionMode()
+            Toast.makeText(context, context.getString(R.string.sender_blocked), Toast.LENGTH_SHORT).show()
+        },
+        onDismiss = {
+            viewModel.showBlockConfirm = false
+            viewModel.pendingBlockSenders = emptyList()
+        }
     )
     } // Scaffold
 }
