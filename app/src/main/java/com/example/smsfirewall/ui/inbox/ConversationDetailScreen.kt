@@ -300,7 +300,7 @@ internal fun ConversationDetailScreen(
                 FilledIconButton(
                     onClick  = { submitMessage(); keyboardController?.hide() },
                     enabled  = draftMessage.isNotBlank(),
-                    modifier = Modifier.size(48.dp),
+                    modifier = Modifier.size(48.dp).scale(sendButtonScale),
                     shape    = CircleShape,
                     colors   = IconButtonDefaults.filledIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
