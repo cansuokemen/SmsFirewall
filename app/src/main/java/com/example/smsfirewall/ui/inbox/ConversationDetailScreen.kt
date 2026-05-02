@@ -34,6 +34,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,6 +45,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -77,9 +82,16 @@ internal fun ConversationDetailScreen(
     val listState       = rememberLazyListState()
     val focusManager    = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val haptic          = LocalHapticFeedback.current
     val density         = LocalDensity.current
     val displayMessages = remember(conversation.messages) { conversation.messages.asReversed() }
     val isKeyboardVisible = WindowInsets.ime.getBottom(density) > 0
+
+    val sendButtonScale by animateFloatAsState(
+        targetValue   = if (draftMessage.isNotBlank()) 1f else 0.88f,
+        animationSpec = tween(200),
+        label         = "sendScale"
+    )
 
     val displayName   = contactName ?: conversation.displaySender
     val avatarLetter  = displayName.firstOrNull()?.uppercase() ?: "?"
@@ -170,7 +182,10 @@ internal fun ConversationDetailScreen(
                 }
             },
             navigationIcon = {
-                IconButton(onClick = handleBack) {
+                IconButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                    handleBack()
+                }) {
                     Icon(
                         imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(R.string.cd_back)
