@@ -156,13 +156,17 @@ internal fun BatchDeleteConfirmDialog(
     onDismiss: () -> Unit
 ) {
     if (!show) return
+    val haptic = LocalHapticFeedback.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.delete_selected)) },
         text = { Text(text = stringResource(R.string.delete_selected_confirm, count)) },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
+            TextButton(onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onConfirm()
+            }) {
                 Text(
                     text = stringResource(R.string.delete),
                     color = MaterialTheme.colorScheme.error
@@ -185,6 +189,7 @@ internal fun BlockSenderConfirmDialog(
     onDismiss: () -> Unit
 ) {
     if (!show) return
+    val haptic = LocalHapticFeedback.current
 
     val message = if (senderNames.size == 1) {
         stringResource(R.string.block_confirm_message, senderNames.first())
@@ -197,7 +202,10 @@ internal fun BlockSenderConfirmDialog(
         title = { Text(text = stringResource(R.string.block_confirm_title)) },
         text = { Text(text = message) },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
+            TextButton(onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onConfirm()
+            }) {
                 Text(
                     text = stringResource(R.string.block),
                     color = MaterialTheme.colorScheme.error
