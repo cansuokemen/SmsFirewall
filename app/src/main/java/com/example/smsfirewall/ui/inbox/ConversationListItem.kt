@@ -43,7 +43,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,6 +63,7 @@ internal fun ConversationListItem(
 ) {
     val currentState by rememberUpdatedState(state)
     val currentCallbacks by rememberUpdatedState(callbacks)
+    val haptic = LocalHapticFeedback.current
 
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -144,7 +147,10 @@ internal fun ConversationListItem(
                             if (state.isActionsVisible) callbacks.onHideActions()
                             else callbacks.onOpenConversation()
                         },
-                        onLongClick = callbacks.onLongClick
+                        onLongClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            callbacks.onLongClick()
+                        }
                     ),
                 shape  = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
