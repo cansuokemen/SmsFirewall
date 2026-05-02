@@ -33,6 +33,8 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -90,6 +92,15 @@ internal fun ConversationListItem(
     val avatarLetter  = displayName.firstOrNull()?.uppercase() ?: "?"
     val avatarColor   = avatarColorForSender(conversation.displaySender)
     val hasUnread     = conversation.unreadCount > 0
+
+    val cardBgColor by animateColorAsState(
+        targetValue = when {
+            state.isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+            else             -> MaterialTheme.colorScheme.surface
+        },
+        animationSpec = tween(durationMillis = 200),
+        label = "cardBg"
+    )
 
     val avatarBrush = remember(avatarColor) {
         Brush.linearGradient(
@@ -153,13 +164,7 @@ internal fun ConversationListItem(
                         }
                     ),
                 shape  = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = when {
-                        state.isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                        hasUnread        -> MaterialTheme.colorScheme.surface
-                        else             -> MaterialTheme.colorScheme.surface
-                    }
-                ),
+                colors = CardDefaults.cardColors(containerColor = cardBgColor),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Row(
