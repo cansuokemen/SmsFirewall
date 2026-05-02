@@ -3,7 +3,9 @@ package com.example.smsfirewall.ui.inbox
 import android.app.TimePickerDialog
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -62,7 +64,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -387,6 +391,7 @@ private fun SwitchSettingItem(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     ListItem(
         headlineContent    = { Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium) },
         supportingContent  = { Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
@@ -397,9 +402,20 @@ private fun SwitchSettingItem(
                 tint               = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
         },
-        trailingContent    = { Switch(checked = checked, onCheckedChange = onCheckedChange) },
+        trailingContent    = {
+            Switch(
+                checked = checked,
+                onCheckedChange = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onCheckedChange(it)
+                }
+            )
+        },
         colors             = ListItemDefaults.colors(containerColor = Color.Transparent),
-        modifier           = Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) }
+        modifier           = Modifier.fillMaxWidth().clickable {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onCheckedChange(!checked)
+        }
     )
 }
 
