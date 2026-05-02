@@ -5,6 +5,7 @@ import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -112,7 +113,11 @@ internal fun ConversationListContent(
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Header
-            if (viewModel.isSelectionMode) {
+            AnimatedVisibility(
+                visible = viewModel.isSelectionMode,
+                enter   = slideInVertically(initialOffsetY = { -it }) + fadeIn(tween(200)),
+                exit    = slideOutVertically(targetOffsetY = { -it }) + fadeOut(tween(200))
+            ) {
                 SelectionModeHeader(
                     selectedCount = viewModel.selectedConversationKeys.size,
                     allSelected = filteredConversations.isNotEmpty() &&
@@ -133,7 +138,12 @@ internal fun ConversationListContent(
                     onDelete = { viewModel.showBatchDeleteConfirm = true },
                     hasSelection = viewModel.selectedConversationKeys.isNotEmpty()
                 )
-            } else {
+            }
+            AnimatedVisibility(
+                visible = !viewModel.isSelectionMode,
+                enter   = slideInVertically(initialOffsetY = { -it }) + fadeIn(tween(200)),
+                exit    = slideOutVertically(targetOffsetY = { -it }) + fadeOut(tween(200))
+            ) {
                 NormalHeader(onOpenSettings = { viewModel.openSettings() })
             }
 
