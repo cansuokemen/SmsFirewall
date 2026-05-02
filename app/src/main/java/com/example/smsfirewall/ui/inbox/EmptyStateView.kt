@@ -1,5 +1,11 @@
 package com.example.smsfirewall.ui.inbox
 
+import androidx.compose.animation.core.EaseInOut
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,9 +24,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -35,6 +43,17 @@ internal fun EmptyStateView(
     subtitle: String,
     modifier: Modifier = Modifier
 ) {
+    val breathTransition = rememberInfiniteTransition(label = "iconBreathe")
+    val breathScale by breathTransition.animateFloat(
+        initialValue   = 1f,
+        targetValue    = 1.08f,
+        animationSpec  = infiniteRepeatable(
+            animation  = tween(2000, easing = EaseInOut),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "breathScale"
+    )
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -46,6 +65,7 @@ internal fun EmptyStateView(
         Box(
             modifier = Modifier
                 .size(100.dp)
+                .scale(breathScale)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
             contentAlignment = Alignment.Center
