@@ -33,13 +33,9 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -47,6 +43,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -97,6 +94,12 @@ internal fun ConversationListItem(
     val avatarLetter  = displayName.firstOrNull()?.uppercase() ?: "?"
     val avatarColor   = avatarColorForSender(conversation.displaySender)
     val hasUnread     = conversation.unreadCount > 0
+
+    val actionsAlpha by animateFloatAsState(
+        targetValue   = if (state.isActionsVisible) 1f else 0f,
+        animationSpec = tween(durationMillis = 200),
+        label         = "actionsAlpha"
+    )
 
     val cardBgColor by animateColorAsState(
         targetValue = when {
@@ -282,15 +285,12 @@ internal fun ConversationListItem(
                 }
             }
 
-            // Swipe action overlay
-            AnimatedVisibility(
-                visible = state.isActionsVisible,
-                enter = slideInHorizontally(tween(200)) { it } + fadeIn(tween(200)),
-                exit  = slideOutHorizontally(tween(180)) { it } + fadeOut(tween(180)),
-                modifier = Modifier.align(Alignment.CenterEnd)
-            ) {
+            // Swipe action overlay (alpha animated)
+            if (state.isActionsVisible || actionsAlpha > 0f) {
                 Row(
                     modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .alpha(actionsAlpha)
                         .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.97f))
                         .padding(horizontal = 8.dp, vertical = 8.dp),
