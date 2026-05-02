@@ -95,7 +95,18 @@ internal fun ConversationListContent(
                 putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
             }
         }
-        context.startActivity(intent)
+        try {
+            context.startActivity(intent)
+        } catch (_: android.content.ActivityNotFoundException) {
+            val fallback = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            }
+            try {
+                context.startActivity(fallback)
+            } catch (_: android.content.ActivityNotFoundException) {
+                Toast.makeText(context, context.getString(R.string.open_settings), Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
