@@ -42,13 +42,14 @@ private val IncomingBubbleShape = RoundedCornerShape(
 internal fun DetailMessageBubble(
     sms: SmsEntity,
     onClick: () -> Unit = {},
-    onLongPress: () -> Unit
+    onLongPress: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val isOutgoing = sms.reason == SENT_MESSAGE_REASON
     val bubbleShape = if (isOutgoing) OutgoingBubbleShape else IncomingBubbleShape
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = if (isOutgoing) Arrangement.End else Arrangement.Start
     ) {
         Column(
