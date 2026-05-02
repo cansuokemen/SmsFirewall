@@ -505,18 +505,31 @@ private fun BlockedSenderItem(sender: String, onRemove: () -> Unit) {
 
 @Composable
 private fun RetentionOption(label: String, selected: Boolean, onClick: () -> Unit) {
+    val haptic = LocalHapticFeedback.current
+    val textColor by animateColorAsState(
+        targetValue   = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        animationSpec = tween(200),
+        label         = "retentionTextColor"
+    )
     ListItem(
         headlineContent = {
             Text(
                 text       = label,
                 style      = MaterialTheme.typography.bodyLarge,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color      = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                color      = textColor
             )
         },
         trailingContent = { RadioButton(selected = selected, onClick = null) },
         colors   = ListItemDefaults.colors(containerColor = Color.Transparent),
-        modifier = Modifier.fillMaxWidth().selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
+        modifier = Modifier.fillMaxWidth().selectable(
+            selected = selected,
+            onClick  = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            },
+            role = Role.RadioButton
+        )
     )
 }
 
