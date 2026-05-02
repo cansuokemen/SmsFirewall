@@ -170,8 +170,8 @@ fun BlockedSmsScreen(
                     if (targetState == ScreenState.LIST) {
                         // Back → slide from left, spring physics
                         (slideInHorizontally(
-                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                            initialOffsetX = { -it / 3 }
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
+                            initialOffsetX = { -it / 4 }
                         ) + fadeIn(tween(200))) togetherWith
                         (slideOutHorizontally(
                             animationSpec = tween(250),
