@@ -1,8 +1,6 @@
 package com.example.smsfirewall
 
 import android.Manifest
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.ContentValues
@@ -131,21 +129,6 @@ class SmsReceiver : BroadcastReceiver() {
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             return
-        }
-
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                NotificationConstants.ALLOWED_SMS_CHANNEL_ID,
-                context.getString(R.string.notification_channel_name),
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                enableVibration(notificationPreferenceStore.isVibrationEnabled())
-                if (!notificationPreferenceStore.isSoundEnabled()) {
-                    setSound(null, null)
-                }
-            }
-            manager.createNotificationChannel(channel)
         }
 
         val openAppIntent = Intent(context, MainActivity::class.java).apply {
