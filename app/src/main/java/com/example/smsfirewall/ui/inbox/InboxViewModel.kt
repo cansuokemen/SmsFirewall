@@ -203,8 +203,7 @@ class InboxViewModel @Inject constructor(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val manager = context.getSystemService(NotificationManager::class.java)
                 val channel = manager?.getNotificationChannel(NotificationConstants.ALLOWED_SMS_CHANNEL_ID)
-                if (channel == null) return true
-                return channel.importance < NotificationManager.IMPORTANCE_HIGH
+                return channel != null && channel.importance < NotificationManager.IMPORTANCE_HIGH
             }
             return false
         }
