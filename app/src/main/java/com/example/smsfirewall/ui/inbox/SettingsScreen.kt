@@ -485,13 +485,17 @@ private fun BlockedSenderInput(onAdd: (String) -> Boolean) {
 
 @Composable
 private fun BlockedSenderItem(sender: String, onRemove: () -> Unit) {
+    val haptic = LocalHapticFeedback.current
     ListItem(
         headlineContent = { Text(text = sender, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium) },
         leadingContent  = {
             Icon(imageVector = Icons.Outlined.Block, contentDescription = null, tint = MaterialTheme.colorScheme.error)
         },
         trailingContent = {
-            IconButton(onClick = onRemove) {
+            IconButton(onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onRemove()
+            }) {
                 Icon(
                     imageVector        = Icons.Outlined.RemoveCircleOutline,
                     contentDescription = stringResource(R.string.cd_remove_blocked_number),
