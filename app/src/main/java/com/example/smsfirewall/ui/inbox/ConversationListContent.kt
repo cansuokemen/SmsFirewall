@@ -60,8 +60,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -84,6 +86,7 @@ internal fun ConversationListContent(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val haptic = LocalHapticFeedback.current
 
     val openNotificationSettings: () -> Unit = {
         val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -299,7 +302,10 @@ internal fun ConversationListContent(
                 keyboardController?.hide()
             },
             showNewMessageFab = viewModel.selectedTab == InboxTab.MESSAGES,
-            onNewMessage      = { viewModel.openNewMessage() },
+            onNewMessage      = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                viewModel.openNewMessage()
+            },
             modifier          = Modifier.align(Alignment.BottomCenter)
         )
     }
