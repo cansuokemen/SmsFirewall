@@ -21,7 +21,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
@@ -36,6 +38,7 @@ internal fun MessageOptionsDialog(
     onBlockSender: ((SmsEntity) -> Unit)? = null
 ) {
     if (sms == null) return
+    val haptic = LocalHapticFeedback.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -43,7 +46,10 @@ internal fun MessageOptionsDialog(
         text = {
             Column {
                 TextButton(
-                    onClick = { onCopy(sms) },
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onCopy(sms)
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -61,7 +67,10 @@ internal fun MessageOptionsDialog(
                     }
                 }
                 TextButton(
-                    onClick = { onDelete(sms) },
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onDelete(sms)
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -84,7 +93,10 @@ internal fun MessageOptionsDialog(
                 }
                 if (onBlockSender != null) {
                     TextButton(
-                        onClick = { onBlockSender(sms) },
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onBlockSender(sms)
+                        },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
