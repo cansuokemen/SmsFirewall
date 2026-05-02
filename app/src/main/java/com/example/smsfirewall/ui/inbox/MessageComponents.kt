@@ -24,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,6 +49,7 @@ internal fun DetailMessageBubble(
 ) {
     val isOutgoing = sms.reason == SENT_MESSAGE_REASON
     val bubbleShape = if (isOutgoing) OutgoingBubbleShape else IncomingBubbleShape
+    val haptic = LocalHapticFeedback.current
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -60,7 +63,13 @@ internal fun DetailMessageBubble(
                     if (isOutgoing) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.surfaceVariant
                 )
-                .combinedClickable(onClick = onClick, onLongClick = onLongPress)
+                .combinedClickable(
+                    onClick    = onClick,
+                    onLongClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onLongPress()
+                    }
+                )
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Text(
