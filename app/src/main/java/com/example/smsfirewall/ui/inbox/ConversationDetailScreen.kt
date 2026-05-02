@@ -3,6 +3,7 @@ package com.example.smsfirewall.ui.inbox
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -41,6 +42,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -50,8 +55,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
@@ -68,23 +74,38 @@ internal fun ConversationDetailScreen(
 ) {
     val context = LocalContext.current
     var draftMessage by remember(conversation.senderKey) { mutableStateOf("") }
-    val listState = rememberLazyListState()
-    val focusManager = LocalFocusManager.current
+    val listState       = rememberLazyListState()
+    val focusManager    = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val density = LocalDensity.current
+    val density         = LocalDensity.current
     val displayMessages = remember(conversation.messages) { conversation.messages.asReversed() }
     val isKeyboardVisible = WindowInsets.ime.getBottom(density) > 0
 
+    val displayName   = contactName ?: conversation.displaySender
+    val avatarLetter  = displayName.firstOrNull()?.uppercase() ?: "?"
+    val avatarColor   = avatarColorForSender(conversation.displaySender)
+    val avatarBrush   = remember(avatarColor) {
+        Brush.linearGradient(
+            colors = listOf(
+                avatarColor,
+                Color(
+                    red   = (avatarColor.red   + (1f - avatarColor.red)   * 0.35f).coerceIn(0f, 1f),
+                    green = (avatarColor.green + (1f - avatarColor.green) * 0.35f).coerceIn(0f, 1f),
+                    blue  = (avatarColor.blue  + (1f - avatarColor.blue)  * 0.35f).coerceIn(0f, 1f),
+                    alpha = 1f
+                )
+            ),
+            start = Offset(0f, 0f),
+            end   = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+        )
+    }
+
     LaunchedEffect(displayMessages.size) {
-        if (displayMessages.isNotEmpty()) {
-            listState.scrollToItem(0)
-        }
+        if (displayMessages.isNotEmpty()) listState.scrollToItem(0)
     }
 
     LaunchedEffect(isKeyboardVisible) {
-        if (isKeyboardVisible && displayMessages.isNotEmpty()) {
-            listState.animateScrollToItem(0)
-        }
+        if (isKeyboardVisible && displayMessages.isNotEmpty()) listState.animateScrollToItem(0)
     }
 
     fun submitMessage() {
@@ -101,8 +122,6 @@ internal fun ConversationDetailScreen(
         callbacks.onBack()
     }
 
-    val displayName = contactName ?: conversation.displaySender
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -111,34 +130,55 @@ internal fun ConversationDetailScreen(
     ) {
         TopAppBar(
             title = {
-                Column {
-                    Text(
-                        text = displayName,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    if (contactName != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Mini gradient avatar
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(avatarBrush),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            text = conversation.displaySender,
+                            text       = avatarLetter,
+                            style      = MaterialTheme.typography.labelLarge,
+                            color      = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Column {
+                        Text(
+                            text     = displayName,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style    = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
                         )
+                        if (contactName != null) {
+                            Text(
+                                text     = conversation.displaySender,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style    = MaterialTheme.typography.bodySmall,
+                                color    = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             },
             navigationIcon = {
                 IconButton(onClick = handleBack) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(R.string.cd_back)
                     )
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.background
+                containerColor = MaterialTheme.colorScheme.surface
             )
         )
 
@@ -146,33 +186,30 @@ internal fun ConversationDetailScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            state = listState,
+            state   = listState,
             reverseLayout = true,
             verticalArrangement = Arrangement.spacedBy(4.dp),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
         ) {
-            var lastDateHeader: String? = null
             displayMessages.forEachIndexed { index, sms ->
                 val dateHeader = formatDateHeader(context, sms.receivedAt)
-                val nextSms = displayMessages.getOrNull(index + 1)
+                val nextSms    = displayMessages.getOrNull(index + 1)
                 val nextDateHeader = nextSms?.let { formatDateHeader(context, it.receivedAt) }
 
                 item(key = sms.id) {
                     DetailMessageBubble(
-                        sms = sms,
-                        onClick = {
+                        sms       = sms,
+                        onClick   = {
                             focusManager.clearFocus()
                             keyboardController?.hide()
-                            if (isSpamConversation) {
-                                callbacks.onSpamMessageClick(sms)
-                            }
+                            if (isSpamConversation) callbacks.onSpamMessageClick(sms)
                         },
                         onLongPress = { callbacks.onMessageLongPress(sms) }
                     )
                     if (isSpamConversation) {
                         SpamMessageActionRow(
                             onMarkAsNotSpam = { callbacks.onMarkAsNotSpam(sms) },
-                            onDelete = { callbacks.onDeleteSpam(sms) }
+                            onDelete        = { callbacks.onDeleteSpam(sms) }
                         )
                     }
                 }
@@ -186,12 +223,12 @@ internal fun ConversationDetailScreen(
                             horizontalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = dateHeader,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                text     = dateHeader,
+                                style    = MaterialTheme.typography.labelMedium,
+                                color    = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                 modifier = Modifier
                                     .background(
-                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                                         RoundedCornerShape(12.dp)
                                     )
                                     .padding(horizontal = 12.dp, vertical = 4.dp)
@@ -206,14 +243,14 @@ internal fun ConversationDetailScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
+                    .background(MaterialTheme.colorScheme.surface)
                     .imePadding()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedTextField(
-                    value = draftMessage,
+                    value         = draftMessage,
                     onValueChange = { draftMessage = it },
                     modifier = Modifier
                         .weight(1f)
@@ -224,47 +261,39 @@ internal fun ConversationDetailScreen(
                                 submitMessage()
                                 keyboardController?.hide()
                                 true
-                            } else {
-                                false
-                            }
+                            } else false
                         },
-                    singleLine = true,
-                    shape = RoundedCornerShape(24.dp),
+                    singleLine  = true,
+                    shape       = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedContainerColor   = MaterialTheme.colorScheme.surfaceVariant,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
+                        focusedBorderColor      = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor    = Color.Transparent
                     ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(
-                        onSend = {
-                            submitMessage()
-                            keyboardController?.hide()
-                        }
+                        onSend = { submitMessage(); keyboardController?.hide() }
                     ),
                     placeholder = {
                         Text(
-                            text = stringResource(R.string.message_input_placeholder),
+                            text  = stringResource(R.string.message_input_placeholder),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 )
                 FilledIconButton(
-                    onClick = {
-                        submitMessage()
-                        keyboardController?.hide()
-                    },
-                    enabled = draftMessage.isNotBlank(),
+                    onClick  = { submitMessage(); keyboardController?.hide() },
+                    enabled  = draftMessage.isNotBlank(),
                     modifier = Modifier.size(48.dp),
-                    shape = CircleShape,
-                    colors = IconButtonDefaults.filledIconButtonColors(
+                    shape    = CircleShape,
+                    colors   = IconButtonDefaults.filledIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        contentColor   = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        imageVector        = Icons.AutoMirrored.Filled.Send,
                         contentDescription = stringResource(R.string.cd_send)
                     )
                 }

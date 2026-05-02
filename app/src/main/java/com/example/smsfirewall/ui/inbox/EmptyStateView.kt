@@ -1,11 +1,15 @@
 package com.example.smsfirewall.ui.inbox
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.Search
@@ -16,8 +20,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
 
@@ -29,27 +36,41 @@ internal fun EmptyStateView(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = stringResource(R.string.cd_empty_state),
-            modifier = Modifier.size(72.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
+        // Colored circle background for icon
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector        = icon,
+                contentDescription = null,
+                modifier           = Modifier.size(48.dp),
+                tint               = MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(Modifier.height(28.dp))
         Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text       = title,
+            style      = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color      = MaterialTheme.colorScheme.onSurface,
+            textAlign  = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            text      = subtitle,
+            style     = MaterialTheme.typography.bodyMedium,
+            color     = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
         )
     }
 }
@@ -57,8 +78,8 @@ internal fun EmptyStateView(
 @Composable
 internal fun MessagesEmptyState(modifier: Modifier = Modifier) {
     EmptyStateView(
-        icon = Icons.Outlined.MailOutline,
-        title = stringResource(R.string.empty_messages_title),
+        icon     = Icons.Outlined.MailOutline,
+        title    = stringResource(R.string.empty_messages_title),
         subtitle = stringResource(R.string.empty_messages_subtitle),
         modifier = modifier
     )
@@ -67,8 +88,8 @@ internal fun MessagesEmptyState(modifier: Modifier = Modifier) {
 @Composable
 internal fun SpamEmptyState(modifier: Modifier = Modifier) {
     EmptyStateView(
-        icon = Icons.Outlined.Shield,
-        title = stringResource(R.string.empty_spam_title),
+        icon     = Icons.Outlined.Shield,
+        title    = stringResource(R.string.empty_spam_title),
         subtitle = stringResource(R.string.empty_spam_subtitle),
         modifier = modifier
     )
@@ -77,8 +98,8 @@ internal fun SpamEmptyState(modifier: Modifier = Modifier) {
 @Composable
 internal fun SearchEmptyState(modifier: Modifier = Modifier) {
     EmptyStateView(
-        icon = Icons.Outlined.Search,
-        title = stringResource(R.string.empty_search_title),
+        icon     = Icons.Outlined.Search,
+        title    = stringResource(R.string.empty_search_title),
         subtitle = stringResource(R.string.empty_search_subtitle),
         modifier = modifier
     )

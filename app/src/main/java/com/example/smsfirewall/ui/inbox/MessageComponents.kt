@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Button
@@ -29,6 +30,13 @@ import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
 import com.example.smsfirewall.data.local.SmsEntity
 
+private val OutgoingBubbleShape = RoundedCornerShape(
+    topStart = 18.dp, topEnd = 6.dp, bottomStart = 18.dp, bottomEnd = 18.dp
+)
+private val IncomingBubbleShape = RoundedCornerShape(
+    topStart = 6.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 18.dp
+)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun DetailMessageBubble(
@@ -37,47 +45,37 @@ internal fun DetailMessageBubble(
     onLongPress: () -> Unit
 ) {
     val isOutgoing = sms.reason == SENT_MESSAGE_REASON
+    val bubbleShape = if (isOutgoing) OutgoingBubbleShape else IncomingBubbleShape
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isOutgoing) Arrangement.End else Arrangement.Start
     ) {
         Column(
             modifier = Modifier
-                .widthIn(max = 300.dp)
-                .clip(MaterialTheme.shapes.medium)
+                .widthIn(max = 280.dp)
+                .clip(bubbleShape)
                 .background(
-                    if (isOutgoing) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    }
+                    if (isOutgoing) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.surfaceVariant
                 )
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = onLongPress
-                )
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .combinedClickable(onClick = onClick, onLongClick = onLongPress)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Text(
-                text = sms.body.ifBlank { stringResource(R.string.empty_message_placeholder) },
+                text  = sms.body.ifBlank { stringResource(R.string.empty_message_placeholder) },
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (isOutgoing) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
+                color = if (isOutgoing) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = formatMessageTimestamp(sms.receivedAt),
-                style = MaterialTheme.typography.labelSmall,
-                color = if (isOutgoing) {
-                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                },
+                text     = formatMessageTimestamp(sms.receivedAt),
+                style    = MaterialTheme.typography.labelSmall,
+                color    = if (isOutgoing) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.65f)
+                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier
                     .align(Alignment.End)
-                    .padding(top = 2.dp)
+                    .padding(top = 3.dp)
             )
         }
     }
@@ -95,27 +93,24 @@ internal fun MessageBubble(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
+            .clip(IncomingBubbleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongPress
-            )
-            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .combinedClickable(onClick = onClick, onLongClick = onLongPress)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Text(
-            text = sms.body.ifBlank { stringResource(R.string.empty_message_placeholder) },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text     = sms.body.ifBlank { stringResource(R.string.empty_message_placeholder) },
+            style    = MaterialTheme.typography.bodyMedium,
+            color    = MaterialTheme.colorScheme.onSurfaceVariant,
             minLines = bodyMaxLines,
             maxLines = bodyMaxLines,
             overflow = TextOverflow.Ellipsis
         )
         if (showReason) {
             Text(
-                text = stringResource(R.string.reason_prefix, sms.reason),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                text     = stringResource(R.string.reason_prefix, sms.reason),
+                style    = MaterialTheme.typography.bodySmall,
+                color    = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -131,15 +126,16 @@ internal fun SpamMessageActionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 4.dp),
+            .padding(top = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Button(
             onClick = onMarkAsNotSpam,
             modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                contentColor   = MaterialTheme.colorScheme.onPrimaryContainer
             )
         ) {
             Text(text = stringResource(R.string.not_spam), style = MaterialTheme.typography.labelLarge)
@@ -147,9 +143,10 @@ internal fun SpamMessageActionRow(
         Button(
             onClick = onDelete,
             modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                contentColor   = MaterialTheme.colorScheme.onErrorContainer
             )
         ) {
             Text(text = stringResource(R.string.delete), style = MaterialTheme.typography.labelLarge)
@@ -165,12 +162,12 @@ internal fun SwipeActionButton(
 ) {
     IconButton(
         modifier = Modifier.size(44.dp),
-        onClick = onClick
+        onClick  = onClick
     ) {
         Icon(
-            imageVector = icon,
+            imageVector        = icon,
             contentDescription = contentDescription,
-            tint = MaterialTheme.colorScheme.onSurface
+            tint               = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

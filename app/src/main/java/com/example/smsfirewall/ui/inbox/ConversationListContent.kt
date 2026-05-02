@@ -12,6 +12,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,8 +35,10 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Deselect
+import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -43,7 +46,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -53,6 +56,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -93,7 +99,7 @@ internal fun ConversationListContent(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+        Column(modifier = Modifier.fillMaxSize()) {
             // Header
             if (viewModel.isSelectionMode) {
                 SelectionModeHeader(
@@ -104,47 +110,60 @@ internal fun ConversationListContent(
                     onToggleSelectAll = {
                         val allSelected = filteredConversations.isNotEmpty() &&
                             viewModel.selectedConversationKeys.size == filteredConversations.size
-                        if (allSelected) {
-                            viewModel.deselectAll()
-                        } else {
-                            viewModel.selectAll(filteredConversations.map { it.senderKey }.toSet())
-                        }
+                        if (allSelected) viewModel.deselectAll()
+                        else viewModel.selectAll(filteredConversations.map { it.senderKey }.toSet())
                     },
                     onBlock = {
-                        val selectedSenders = filteredConversations
+                        viewModel.pendingBlockSenders = filteredConversations
                             .filter { it.senderKey in viewModel.selectedConversationKeys }
                             .map { it.displaySender }
-                        viewModel.pendingBlockSenders = selectedSenders
                         viewModel.showBlockConfirm = true
                     },
                     onDelete = { viewModel.showBatchDeleteConfirm = true },
                     hasSelection = viewModel.selectedConversationKeys.isNotEmpty()
                 )
             } else {
-                NormalHeader(
-                    onOpenSettings = { viewModel.openSettings() }
-                )
+                NormalHeader(onOpenSettings = { viewModel.openSettings() })
             }
 
             if (viewModel.shouldShowNotificationWarning) {
                 NotificationWarningCard(onOpenSettings = openNotificationSettings)
             }
 
-            SecondaryTabRow(
+            // Tab row with icons
+            PrimaryTabRow(
                 selectedTabIndex = viewModel.selectedTab.ordinal,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.primary
             ) {
                 InboxTab.entries.forEach { tab ->
                     Tab(
                         selected = viewModel.selectedTab == tab,
-                        onClick = { viewModel.selectTab(tab) },
-                        text = {
+                        onClick  = { viewModel.selectTab(tab) },
+                        selectedContentColor   = MaterialTheme.colorScheme.primary,
+                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = when (tab) {
+                                    InboxTab.MESSAGES -> Icons.Outlined.MailOutline
+                                    InboxTab.SPAM     -> Icons.Outlined.Shield
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Text(
-                                text = stringResource(tab.titleResId),
-                                style = MaterialTheme.typography.labelLarge
+                                text  = stringResource(tab.titleResId),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (viewModel.selectedTab == tab) FontWeight.Bold else FontWeight.Normal
                             )
                         }
-                    )
+                    }
                 }
             }
 
@@ -154,12 +173,12 @@ internal fun ConversationListContent(
 
             PullToRefreshBox(
                 isRefreshing = viewModel.isRefreshing,
-                onRefresh = { viewModel.refresh() },
+                onRefresh    = { viewModel.refresh() },
                 modifier = Modifier
                     .fillMaxSize()
                     .clickable(
-                        indication = null,
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                        indication     = null,
+                        interactionSource = remember { MutableInteractionSource() }
                     ) {
                         if (viewModel.actionRevealedConversationKey != null) {
                             viewModel.actionRevealedConversationKey = null
@@ -167,20 +186,19 @@ internal fun ConversationListContent(
                     }
             ) {
                 if (filteredConversations.isEmpty()) {
-                    if (viewModel.conversationSearchQuery.isNotBlank()) {
-                        SearchEmptyState()
-                    } else if (viewModel.selectedTab == InboxTab.MESSAGES) {
-                        MessagesEmptyState()
-                    } else {
-                        SpamEmptyState()
+                    when {
+                        viewModel.conversationSearchQuery.isNotBlank() -> SearchEmptyState()
+                        viewModel.selectedTab == InboxTab.MESSAGES     -> MessagesEmptyState()
+                        else                                            -> SpamEmptyState()
                     }
                 } else {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(top = 8.dp, bottom = 80.dp),
+                            .padding(horizontal = 12.dp)
+                            .padding(top = 8.dp, bottom = 100.dp),
                         state = conversationListState,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         items(filteredConversations, key = { it.senderKey }) { conversation ->
                             val isSenderMuted = remember(conversation.senderKey, viewModel.mutedSendersChangeToken) {
@@ -190,15 +208,15 @@ internal fun ConversationListContent(
                                 viewModel.getContactName(conversation.displaySender)
                             }
                             val itemState = ConversationItemState(
-                                isSelectionMode = viewModel.isSelectionMode,
-                                isSelected = conversation.senderKey in viewModel.selectedConversationKeys,
-                                isActionsVisible = viewModel.actionRevealedConversationKey == conversation.senderKey && !viewModel.isSelectionMode,
-                                isNotificationsMuted = isSenderMuted,
-                                showReason = viewModel.selectedTab == InboxTab.SPAM
+                                isSelectionMode       = viewModel.isSelectionMode,
+                                isSelected            = conversation.senderKey in viewModel.selectedConversationKeys,
+                                isActionsVisible      = viewModel.actionRevealedConversationKey == conversation.senderKey && !viewModel.isSelectionMode,
+                                isNotificationsMuted  = isSenderMuted,
+                                showReason            = viewModel.selectedTab == InboxTab.SPAM
                             )
                             val itemCallbacks = ConversationItemCallbacks(
                                 onToggleSelection = { viewModel.toggleSelection(conversation.senderKey) },
-                                onLongClick = { viewModel.enterSelectionMode(conversation.senderKey) },
+                                onLongClick       = { viewModel.enterSelectionMode(conversation.senderKey) },
                                 onOpenConversation = {
                                     if (viewModel.isSelectionMode) {
                                         viewModel.toggleSelection(conversation.senderKey)
@@ -209,17 +227,16 @@ internal fun ConversationListContent(
                                         }
                                     }
                                 },
-                                onShowActions = {
+                                onShowActions  = {
                                     if (!viewModel.isSelectionMode) {
                                         viewModel.actionRevealedConversationKey = conversation.senderKey
                                     }
                                 },
-                                onHideActions = {
+                                onHideActions  = {
                                     if (viewModel.actionRevealedConversationKey == conversation.senderKey) {
                                         viewModel.actionRevealedConversationKey = null
                                     }
                                 },
-                                onMessageLongPress = { sms -> viewModel.selectedForDelete = sms },
                                 onSwipeDeleteConversation = { viewModel.deleteConversation(conversation) },
                                 onMuteNotifications = {
                                     viewModel.muteNotifications(conversation.displaySender)
@@ -235,11 +252,11 @@ internal fun ConversationListContent(
                                 }
                             )
                             ConversationListItem(
-                                modifier = Modifier.animateItem(),
-                                conversation = conversation,
-                                contactName = contactName,
-                                state = itemState,
-                                callbacks = itemCallbacks
+                                modifier      = Modifier.animateItem(),
+                                conversation  = conversation,
+                                contactName   = contactName,
+                                state         = itemState,
+                                callbacks     = itemCallbacks
                             )
                         }
                     }
@@ -247,9 +264,10 @@ internal fun ConversationListContent(
             }
         }
 
+        // Floating search bar + FAB
         BottomSearchBar(
-            visible = isBottomBarVisible && !viewModel.isSelectionMode,
-            searchInput = viewModel.conversationSearchInput,
+            visible             = isBottomBarVisible && !viewModel.isSelectionMode,
+            searchInput         = viewModel.conversationSearchInput,
             onSearchInputChanged = { value ->
                 viewModel.conversationSearchInput = value
                 viewModel.conversationSearchQuery = value.trim()
@@ -260,8 +278,8 @@ internal fun ConversationListContent(
                 keyboardController?.hide()
             },
             showNewMessageFab = viewModel.selectedTab == InboxTab.MESSAGES,
-            onNewMessage = { viewModel.openNewMessage() },
-            modifier = Modifier.align(Alignment.BottomCenter)
+            onNewMessage      = { viewModel.openNewMessage() },
+            modifier          = Modifier.align(Alignment.BottomCenter)
         )
     }
 }
@@ -279,55 +297,71 @@ private fun SelectionModeHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 4.dp, top = 8.dp, end = 0.dp, bottom = 0.dp),
+            .padding(start = 4.dp, top = 8.dp, end = 0.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onClose) {
-            Icon(
-                imageVector = Icons.Filled.Close,
-                contentDescription = stringResource(R.string.cd_close_selection)
-            )
+            Icon(imageVector = Icons.Filled.Close, contentDescription = stringResource(R.string.cd_close_selection))
         }
         Text(
-            text = stringResource(R.string.selected_count, selectedCount),
-            style = MaterialTheme.typography.titleMedium,
+            text       = stringResource(R.string.selected_count, selectedCount),
+            style      = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f)
+            modifier   = Modifier.weight(1f)
         )
         IconButton(onClick = onToggleSelectAll) {
             Icon(
                 imageVector = if (allSelected) Icons.Outlined.Deselect else Icons.Outlined.SelectAll,
-                contentDescription = stringResource(
-                    if (allSelected) R.string.deselect_all else R.string.select_all
-                )
+                contentDescription = stringResource(if (allSelected) R.string.deselect_all else R.string.select_all)
             )
         }
-        IconButton(
-            onClick = onBlock,
-            enabled = hasSelection
-        ) {
+        IconButton(onClick = onBlock, enabled = hasSelection) {
             Icon(
                 imageVector = Icons.Outlined.Block,
                 contentDescription = stringResource(R.string.block_sender),
-                tint = if (hasSelection) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                }
+                tint = if (hasSelection) MaterialTheme.colorScheme.error
+                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
             )
         }
-        IconButton(
-            onClick = onDelete,
-            enabled = hasSelection
-        ) {
+        IconButton(onClick = onDelete, enabled = hasSelection) {
             Icon(
                 imageVector = Icons.Outlined.Delete,
                 contentDescription = stringResource(R.string.delete_selected),
-                tint = if (hasSelection) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                }
+                tint = if (hasSelection) MaterialTheme.colorScheme.error
+                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun NormalHeader(onOpenSettings: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, top = 20.dp, end = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text       = stringResource(R.string.app_name),
+            style      = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.ExtraBold,
+            color      = MaterialTheme.colorScheme.primary,
+            modifier   = Modifier.weight(1f)
+        )
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable(onClick = onOpenSettings),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector        = Icons.Outlined.Settings,
+                contentDescription = stringResource(R.string.cd_settings),
+                tint               = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier           = Modifier.size(20.dp)
             )
         }
     }
@@ -345,50 +379,49 @@ private fun BottomSearchBar(
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        enter   = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+        exit    = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
         modifier = modifier
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 12.dp)
-                .background(
-                    MaterialTheme.colorScheme.background,
-                    RoundedCornerShape(28.dp)
-                )
-                .imePadding(),
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .shadow(elevation = 8.dp, shape = RoundedCornerShape(32.dp), clip = false)
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(32.dp))
+                .imePadding()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedTextField(
-                value = searchInput,
-                onValueChange = onSearchInputChanged,
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                shape = RoundedCornerShape(28.dp),
-                placeholder = {
+                value          = searchInput,
+                onValueChange  = onSearchInputChanged,
+                modifier       = Modifier.weight(1f),
+                singleLine     = true,
+                shape          = RoundedCornerShape(28.dp),
+                placeholder    = {
                     Text(
-                        text = stringResource(R.string.search_placeholder),
+                        text  = stringResource(R.string.search_placeholder),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 },
                 leadingIcon = {
                     Icon(
-                        imageVector = Icons.Filled.Search,
+                        imageVector        = Icons.Filled.Search,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint               = MaterialTheme.colorScheme.primary
                     )
                 },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    focusedContainerColor    = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor  = MaterialTheme.colorScheme.surfaceVariant,
+                    focusedBorderColor       = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor     = Color.Transparent,
+                    cursorColor              = MaterialTheme.colorScheme.primary,
+                    focusedTextColor         = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor       = MaterialTheme.colorScheme.onSurface,
+                    focusedPlaceholderColor  = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -396,43 +429,18 @@ private fun BottomSearchBar(
             )
             if (showNewMessageFab) {
                 FloatingActionButton(
-                    onClick = onNewMessage,
-                    modifier = Modifier.size(56.dp),
-                    shape = CircleShape,
+                    onClick        = onNewMessage,
+                    modifier       = Modifier.size(52.dp),
+                    shape          = CircleShape,
                     containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+                    contentColor   = MaterialTheme.colorScheme.onPrimary
                 ) {
                     Icon(
-                        painter = painterResource(id = R.drawable.ic_message_send),
+                        painter            = painterResource(id = R.drawable.ic_message_send),
                         contentDescription = stringResource(R.string.cd_new_message)
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun NormalHeader(
-    onOpenSettings: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 4.dp, top = 8.dp, end = 0.dp, bottom = 0.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = stringResource(R.string.app_name),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f)
-        )
-        IconButton(onClick = onOpenSettings) {
-            Icon(
-                imageVector = Icons.Outlined.Settings,
-                contentDescription = stringResource(R.string.cd_settings)
-            )
         }
     }
 }
