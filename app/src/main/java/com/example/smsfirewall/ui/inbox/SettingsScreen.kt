@@ -36,8 +36,8 @@ import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.SettingsBrightness
 import androidx.compose.material.icons.outlined.Vibration
-import androidx.compose.material.icons.outlined.VolumeOff
-import androidx.compose.material.icons.outlined.VolumeUp
+import androidx.compose.material.icons.automirrored.outlined.VolumeOff
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -188,7 +188,7 @@ fun SettingsScreen(
                 ) {
                     Column {
                         SwitchSettingItem(
-                            icon           = if (soundEnabled) Icons.Outlined.VolumeUp else Icons.Outlined.VolumeOff,
+                            icon           = if (soundEnabled) Icons.AutoMirrored.Outlined.VolumeUp else Icons.AutoMirrored.Outlined.VolumeOff,
                             title          = stringResource(R.string.notification_sound),
                             subtitle       = stringResource(R.string.notification_sound_description),
                             checked        = soundEnabled,
