@@ -247,11 +247,12 @@ internal fun NewMessageScreen(
         ) {
             FilledIconButton(
                 onClick = {
+                    if (isReadyToSend) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     submitMessage()
                     keyboardController?.hide()
                 },
-                enabled = destinationAddress.isNotBlank() && draftMessage.isNotBlank(),
-                modifier = Modifier.size(48.dp),
+                enabled = isReadyToSend,
+                modifier = Modifier.size(48.dp).scale(sendButtonScale),
                 shape = CircleShape,
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
