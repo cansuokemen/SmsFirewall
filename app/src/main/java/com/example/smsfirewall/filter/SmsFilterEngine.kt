@@ -32,7 +32,7 @@ class SmsFilterEngine(
         }
 
         val matchedKeyword = blockedKeywords.firstOrNull { keyword ->
-            keyword.isNotBlank() && normalizedBody.contains(keyword.lowercase(Locale.ROOT))
+            keyword.isNotBlank() && normalizedBody.contains(keyword)
         }
         if (matchedKeyword != null) {
             return FilterDecision(
