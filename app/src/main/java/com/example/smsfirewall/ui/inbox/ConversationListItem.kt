@@ -170,7 +170,10 @@ internal fun ConversationListItem(
                     if (state.isSelectionMode) {
                         Checkbox(
                             checked = state.isSelected,
-                            onCheckedChange = { callbacks.onToggleSelection() },
+                            onCheckedChange = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                callbacks.onToggleSelection()
+                            },
                             colors = CheckboxDefaults.colors(
                                 checkedColor = MaterialTheme.colorScheme.primary
                             )
