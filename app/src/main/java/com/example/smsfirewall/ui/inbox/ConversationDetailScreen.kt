@@ -213,6 +213,7 @@ internal fun ConversationDetailScreen(
 
                 item(key = sms.id) {
                     DetailMessageBubble(
+                        modifier  = Modifier.animateItem(),
                         sms       = sms,
                         onClick   = {
                             focusManager.clearFocus()
