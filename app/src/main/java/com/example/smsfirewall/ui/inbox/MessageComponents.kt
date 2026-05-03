@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -58,6 +59,10 @@ internal fun DetailMessageBubble(
         Column(
             modifier = Modifier
                 .widthIn(max = 280.dp)
+                .then(
+                    if (isOutgoing) Modifier.shadow(2.dp, bubbleShape, clip = false)
+                    else Modifier
+                )
                 .clip(bubbleShape)
                 .background(
                     if (isOutgoing) MaterialTheme.colorScheme.primary
