@@ -34,10 +34,10 @@ import com.example.smsfirewall.R
 import com.example.smsfirewall.data.local.SmsEntity
 
 private val OutgoingBubbleShape = RoundedCornerShape(
-    topStart = 18.dp, topEnd = 6.dp, bottomStart = 18.dp, bottomEnd = 18.dp
+    topStart = 20.dp, topEnd = 6.dp, bottomStart = 20.dp, bottomEnd = 20.dp
 )
 private val IncomingBubbleShape = RoundedCornerShape(
-    topStart = 6.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 18.dp
+    topStart = 6.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 20.dp
 )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -60,13 +60,13 @@ internal fun DetailMessageBubble(
             modifier = Modifier
                 .widthIn(max = 280.dp)
                 .then(
-                    if (isOutgoing) Modifier.shadow(2.dp, bubbleShape, clip = false)
+                    if (isOutgoing) Modifier.shadow(3.dp, bubbleShape, clip = false)
                     else Modifier
                 )
                 .clip(bubbleShape)
                 .background(
                     if (isOutgoing) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.surfaceVariant
+                    else MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
                 )
                 .combinedClickable(
                     onClick    = onClick,
@@ -109,14 +109,14 @@ internal fun MessageBubble(
         modifier = Modifier
             .fillMaxWidth()
             .clip(IncomingBubbleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
             .combinedClickable(onClick = onClick, onLongClick = onLongPress)
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Text(
             text     = sms.body.ifBlank { stringResource(R.string.empty_message_placeholder) },
             style    = MaterialTheme.typography.bodyMedium,
-            color    = MaterialTheme.colorScheme.onSurfaceVariant,
+            color    = MaterialTheme.colorScheme.onSurface,
             minLines = bodyMaxLines,
             maxLines = bodyMaxLines,
             overflow = TextOverflow.Ellipsis
@@ -125,7 +125,7 @@ internal fun MessageBubble(
             Text(
                 text     = stringResource(R.string.reason_prefix, sms.reason),
                 style    = MaterialTheme.typography.bodySmall,
-                color    = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                color    = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
