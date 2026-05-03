@@ -343,6 +343,7 @@ private fun SelectionModeHeader(
 
 @Composable
 private fun NormalHeader(onOpenSettings: () -> Unit) {
+    val haptic = LocalHapticFeedback.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -361,7 +362,10 @@ private fun NormalHeader(onOpenSettings: () -> Unit) {
                 .size(40.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clickable(onClick = onOpenSettings),
+                .clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onOpenSettings()
+                },
             contentAlignment = Alignment.Center
         ) {
             Icon(
