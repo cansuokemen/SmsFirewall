@@ -5,6 +5,7 @@ import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -162,32 +163,11 @@ internal fun ConversationListContent(
                 contentColor = MaterialTheme.colorScheme.primary
             ) {
                 InboxTab.entries.forEach { tab ->
-                    Tab(
+                    InboxTabItem(
+                        tab      = tab,
                         selected = viewModel.selectedTab == tab,
-                        onClick  = { viewModel.selectTab(tab) },
-                        selectedContentColor   = MaterialTheme.colorScheme.primary,
-                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = when (tab) {
-                                    InboxTab.MESSAGES -> Icons.Outlined.MailOutline
-                                    InboxTab.SPAM     -> Icons.Outlined.Shield
-                                },
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text  = stringResource(tab.titleResId),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = if (viewModel.selectedTab == tab) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
+                        onClick  = { viewModel.selectTab(tab) }
+                    )
                 }
             }
 
@@ -468,6 +448,41 @@ private fun BottomSearchBar(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun InboxTabItem(tab: InboxTab, selected: Boolean, onClick: () -> Unit) {
+    val iconSize by animateDpAsState(
+        targetValue   = if (selected) 20.dp else 18.dp,
+        animationSpec = tween(200),
+        label         = "tabIconSize"
+    )
+    Tab(
+        selected = selected,
+        onClick  = onClick,
+        selectedContentColor   = MaterialTheme.colorScheme.primary,
+        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+    ) {
+        Row(
+            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = when (tab) {
+                    InboxTab.MESSAGES -> Icons.Outlined.MailOutline
+                    InboxTab.SPAM     -> Icons.Outlined.Shield
+                },
+                contentDescription = null,
+                modifier = Modifier.size(iconSize)
+            )
+            Text(
+                text  = stringResource(tab.titleResId),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+            )
         }
     }
 }
