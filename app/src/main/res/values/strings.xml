@@ -155,4 +155,21 @@
     <string name="spam_retention_description">Spam mesajların otomatik silinmeden önce saklanacağı süreyi belirleyin</string>
     <string name="spam_retention_days">%d gün</string>
     <string name="spam_auto_delete_warning_dynamic">Spam mesajlar %d gün sonra otomatik olarak silinecektir.</string>
+
+    <!-- Background customization -->
+    <string name="background_section_title">Ana menü arka planı</string>
+    <string name="background_section_description">Mesaj listesi için bir arka plan seçin</string>
+    <string name="background_picker_title">Arka plan seç</string>
+    <string name="background_change">Değiştir</string>
+    <string name="background_reset">Sıfırla</string>
+    <string name="background_apply">Uygula</string>
+    <string name="background_cat_gradient">Gradient</string>
+    <string name="background_cat_pattern">Desen</string>
+    <string name="background_cat_solid">Renk</string>
+    <string name="background_cat_image">Galeri</string>
+    <string name="background_pick_image">Galeriden seç</string>
+    <string name="background_pick_image_hint">Görsel seçmek için dokunun</string>
+    <string name="background_conversation_title">Sohbet arka planı</string>
+    <string name="background_conversation_reset">Ana menüye eşitle</string>
+    <string name="cd_more_options">Daha fazla seçenek</string>
 </resources>
