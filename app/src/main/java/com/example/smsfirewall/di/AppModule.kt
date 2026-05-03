@@ -2,6 +2,8 @@ package com.example.smsfirewall.di
 
 import android.content.Context
 import com.example.smsfirewall.data.SpamRetentionPreferenceStore
+import com.example.smsfirewall.data.background.BackgroundImageRepository
+import com.example.smsfirewall.data.background.BackgroundPreferenceStore
 import com.example.smsfirewall.filter.FilterKeywordStore
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationPreferenceStore
@@ -45,5 +47,17 @@ object AppModule {
     @Singleton
     fun provideNotificationPreferenceStore(@ApplicationContext context: Context): NotificationPreferenceStore {
         return NotificationPreferenceStore(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideBackgroundPreferenceStore(@ApplicationContext context: Context): BackgroundPreferenceStore {
+        return BackgroundPreferenceStore(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideBackgroundImageRepository(@ApplicationContext context: Context): BackgroundImageRepository {
+        return BackgroundImageRepository(context)
     }
 }
