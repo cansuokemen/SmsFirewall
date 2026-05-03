@@ -73,8 +73,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.outlined.Wallpaper
+import androidx.compose.foundation.border
 import com.example.smsfirewall.R
 import com.example.smsfirewall.data.SpamRetentionPreferenceStore
+import com.example.smsfirewall.data.background.BackgroundSpec
+import com.example.smsfirewall.ui.background.AppBackground
 import com.example.smsfirewall.ui.theme.ThemeMode
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,6 +101,9 @@ fun SettingsScreen(
     onQuietHoursStartChanged: (Int, Int) -> Unit,
     quietHoursEnd: Pair<Int, Int>,
     onQuietHoursEndChanged: (Int, Int) -> Unit,
+    mainBackground: BackgroundSpec,
+    onChangeMainBackground: () -> Unit,
+    onResetMainBackground: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -173,6 +180,77 @@ fun SettingsScreen(
                             selected = currentThemeMode == ThemeMode.DARK,
                             onClick  = { onThemeModeChanged(ThemeMode.DARK) }
                         )
+                    }
+                }
+                Spacer(Modifier.height(24.dp))
+            }
+
+            // ── Ana menü arka planı ───────────────────────
+            item {
+                SectionHeader(
+                    title       = stringResource(R.string.background_section_title),
+                    description = stringResource(R.string.background_section_description),
+                    icon        = Icons.Outlined.Wallpaper
+                )
+                ElevatedCard(
+                    shape  = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(width = 84.dp, height = 56.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(
+                                    0.5.dp,
+                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                    RoundedCornerShape(12.dp)
+                                )
+                        ) {
+                            AppBackground(spec = mainBackground) { }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text       = stringResource(R.string.background_section_title),
+                                style      = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text  = stringResource(R.string.background_section_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onResetMainBackground()
+                        }) {
+                            Icon(
+                                imageVector = Icons.Outlined.RemoveCircleOutline,
+                                contentDescription = stringResource(R.string.background_reset),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        androidx.compose.material3.TextButton(onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onChangeMainBackground()
+                        }) {
+                            Text(text = stringResource(R.string.background_change))
+                        }
                     }
                 }
                 Spacer(Modifier.height(24.dp))
