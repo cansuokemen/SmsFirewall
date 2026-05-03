@@ -203,7 +203,7 @@ class InboxViewModel @Inject constructor(
 
     private val conversationBackgrounds = mutableStateMapOf<String, BackgroundSpec>()
 
-    fun setMainBackground(spec: BackgroundSpec) {
+    fun applyMainBackground(spec: BackgroundSpec) {
         backgroundPreferenceStore.setMainBackground(spec)
         mainBackground = spec
         viewModelScope.launch {
@@ -233,7 +233,7 @@ class InboxViewModel @Inject constructor(
         return mainBackground
     }
 
-    fun setConversationBackground(address: String, spec: BackgroundSpec) {
+    fun applyConversationBackground(address: String, spec: BackgroundSpec) {
         val key = normalizeSender(address)
         if (key.isBlank()) return
         backgroundPreferenceStore.setConversationBackground(address, spec)

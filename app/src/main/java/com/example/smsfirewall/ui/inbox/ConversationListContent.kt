@@ -73,6 +73,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
 import com.example.smsfirewall.notifications.NotificationConstants
+import com.example.smsfirewall.ui.background.AppBackground
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -114,7 +115,7 @@ internal fun ConversationListContent(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    AppBackground(spec = viewModel.mainBackground, modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Header
             AnimatedVisibility(
