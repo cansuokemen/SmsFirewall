@@ -32,8 +32,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.example.smsfirewall.R
+import com.example.smsfirewall.data.background.BackgroundSpec
 import com.example.smsfirewall.filter.SmsStatus
+import com.example.smsfirewall.ui.background.BackgroundPickerSheet
 import com.example.smsfirewall.ui.theme.ThemeMode
 import com.example.smsfirewall.util.normalizeSender
 
@@ -141,6 +145,8 @@ fun BlockedSmsScreen(
     val undoLabel          = stringResource(R.string.undo)
     val deletedSingleLabel = stringResource(R.string.conversation_deleted)
 
+    var backgroundSheetTarget by remember { mutableStateOf<BackgroundSheetTarget?>(null) }
+
     LaunchedEffect(viewModel.pendingDelete) {
         val pending = viewModel.pendingDelete ?: return@LaunchedEffect
         val count   = pending.conversations.size
@@ -200,6 +206,13 @@ fun BlockedSmsScreen(
                                 contactName       = viewModel.getContactName(conv.displaySender),
                                 canSendMessage    = viewModel.selectedTab == InboxTab.MESSAGES,
                                 isSpamConversation = viewModel.selectedTab == InboxTab.SPAM,
+                                backgroundSpec     = viewModel.backgroundFor(conv.displaySender),
+                                onChangeBackground = {
+                                    backgroundSheetTarget = BackgroundSheetTarget.Conversation(conv.displaySender)
+                                },
+                                onResetBackground = {
+                                    viewModel.resetConversationBackground(conv.displaySender)
+                                },
                                 callbacks = DetailScreenCallbacks(
                                     onBack            = { viewModel.closeConversation() },
                                     onMessageLongPress = { sms -> viewModel.selectedForDelete = sms },
@@ -259,6 +272,9 @@ fun BlockedSmsScreen(
                             onQuietHoursStartChanged = { h, m -> viewModel.setNotifQuietStart(h, m) },
                             quietHoursEnd           = viewModel.notifQuietEnd,
                             onQuietHoursEndChanged  = { h, m -> viewModel.setNotifQuietEnd(h, m) },
+                            mainBackground          = viewModel.mainBackground,
+                            onChangeMainBackground  = { backgroundSheetTarget = BackgroundSheetTarget.Main },
+                            onResetMainBackground   = { viewModel.resetMainBackground() },
                             onBack                  = { viewModel.closeSettings() },
                             modifier                = Modifier.fillMaxSize()
                         )
@@ -322,5 +338,36 @@ fun BlockedSmsScreen(
                 viewModel.pendingBlockSenders = emptyList()
             }
         )
+
+        backgroundSheetTarget?.let { target ->
+            val initial = when (target) {
+                is BackgroundSheetTarget.Main -> viewModel.mainBackground
+                is BackgroundSheetTarget.Conversation -> viewModel.backgroundFor(target.address)
+            }
+            BackgroundPickerSheet(
+                initial           = initial,
+                imageRepository   = viewModel.backgroundImageRepository,
+                onDismiss         = { backgroundSheetTarget = null },
+                onApply           = { spec ->
+                    when (target) {
+                        is BackgroundSheetTarget.Main -> viewModel.applyMainBackground(spec)
+                        is BackgroundSheetTarget.Conversation ->
+                            viewModel.applyConversationBackground(target.address, spec)
+                    }
+                },
+                onReset = {
+                    when (target) {
+                        is BackgroundSheetTarget.Main -> viewModel.resetMainBackground()
+                        is BackgroundSheetTarget.Conversation ->
+                            viewModel.resetConversationBackground(target.address)
+                    }
+                }
+            )
+        }
     }
+}
+
+internal sealed class BackgroundSheetTarget {
+    object Main : BackgroundSheetTarget()
+    data class Conversation(val address: String) : BackgroundSheetTarget()
 }
