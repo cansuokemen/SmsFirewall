@@ -18,6 +18,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smsfirewall.data.SpamRetentionPreferenceStore
 import com.example.smsfirewall.data.SmsRepository
+import com.example.smsfirewall.data.background.BackgroundImageRepository
+import com.example.smsfirewall.data.background.BackgroundPreferenceStore
+import com.example.smsfirewall.data.background.BackgroundSpec
 import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.FilterKeywordStore
 import com.example.smsfirewall.filter.SmsStatus
@@ -53,7 +56,9 @@ class InboxViewModel @Inject constructor(
     val mutedSenderStore: MutedSenderStore,
     val filterKeywordStore: FilterKeywordStore,
     val spamRetentionStore: SpamRetentionPreferenceStore,
-    val notificationPreferenceStore: NotificationPreferenceStore
+    val notificationPreferenceStore: NotificationPreferenceStore,
+    val backgroundPreferenceStore: BackgroundPreferenceStore,
+    val backgroundImageRepository: BackgroundImageRepository
 ) : AndroidViewModel(application) {
 
     private val context get() = getApplication<Application>()
@@ -190,6 +195,62 @@ class InboxViewModel @Inject constructor(
     fun setNotifQuietEnd(hour: Int, minute: Int) {
         notificationPreferenceStore.setQuietHoursEnd(hour, minute)
         notifQuietEnd = hour to minute
+    }
+
+    // --- Arka plan tercihleri ---
+    var mainBackground by mutableStateOf<BackgroundSpec>(backgroundPreferenceStore.getMainBackground())
+        private set
+
+    private val conversationBackgrounds = mutableStateMapOf<String, BackgroundSpec>()
+
+    fun setMainBackground(spec: BackgroundSpec) {
+        backgroundPreferenceStore.setMainBackground(spec)
+        mainBackground = spec
+        viewModelScope.launch {
+            backgroundImageRepository.pruneUnused(backgroundPreferenceStore)
+        }
+    }
+
+    fun resetMainBackground() {
+        backgroundPreferenceStore.resetMainBackground()
+        mainBackground = BackgroundSpec.Default
+        viewModelScope.launch {
+            backgroundImageRepository.pruneUnused(backgroundPreferenceStore)
+        }
+    }
+
+    /** Bir sohbetin etkin arka planını döner: özel atama varsa onu, yoksa ana menüyü. */
+    fun backgroundFor(address: String): BackgroundSpec {
+        val key = normalizeSender(address)
+        if (key.isBlank()) return mainBackground
+        val cached = conversationBackgrounds[key]
+        if (cached != null) return cached
+        val stored = backgroundPreferenceStore.getConversationBackground(address)
+        if (stored != null) {
+            conversationBackgrounds[key] = stored
+            return stored
+        }
+        return mainBackground
+    }
+
+    fun setConversationBackground(address: String, spec: BackgroundSpec) {
+        val key = normalizeSender(address)
+        if (key.isBlank()) return
+        backgroundPreferenceStore.setConversationBackground(address, spec)
+        conversationBackgrounds[key] = spec
+        viewModelScope.launch {
+            backgroundImageRepository.pruneUnused(backgroundPreferenceStore)
+        }
+    }
+
+    fun resetConversationBackground(address: String) {
+        val key = normalizeSender(address)
+        if (key.isBlank()) return
+        backgroundPreferenceStore.resetConversationBackground(address)
+        conversationBackgrounds.remove(key)
+        viewModelScope.launch {
+            backgroundImageRepository.pruneUnused(backgroundPreferenceStore)
+        }
     }
 
     // --- Kişi adı cache ---
