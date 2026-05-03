@@ -23,6 +23,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -66,7 +69,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
+import com.example.smsfirewall.data.background.BackgroundSpec
 import com.example.smsfirewall.data.local.SmsEntity
+import com.example.smsfirewall.ui.background.AppBackground
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +80,9 @@ internal fun ConversationDetailScreen(
     contactName: String?,
     canSendMessage: Boolean,
     isSpamConversation: Boolean,
+    backgroundSpec: BackgroundSpec,
+    onChangeBackground: () -> Unit,
+    onResetBackground: () -> Unit,
     callbacks: DetailScreenCallbacks
 ) {
     val context = LocalContext.current
@@ -134,12 +142,15 @@ internal fun ConversationDetailScreen(
         callbacks.onBack()
     }
 
-    Column(
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    AppBackground(
+        spec = backgroundSpec,
         modifier = Modifier
             .fillMaxSize()
             .swipeBackGesture(onBack = handleBack)
-            .background(MaterialTheme.colorScheme.background)
     ) {
+    Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = {
                 Row(
@@ -192,8 +203,37 @@ internal fun ConversationDetailScreen(
                     )
                 }
             },
+            actions = {
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            imageVector        = Icons.Filled.MoreVert,
+                            contentDescription = stringResource(R.string.cd_more_options)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.background_conversation_title)) },
+                            onClick = {
+                                menuExpanded = false
+                                onChangeBackground()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.background_conversation_reset)) },
+                            onClick = {
+                                menuExpanded = false
+                                onResetBackground()
+                            }
+                        )
+                    }
+                }
+            },
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
             )
         )
 
@@ -316,4 +356,5 @@ internal fun ConversationDetailScreen(
             }
         }
     }
+    } // AppBackground
 }
