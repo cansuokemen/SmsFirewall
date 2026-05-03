@@ -103,8 +103,8 @@ internal fun ConversationListItem(
 
     val cardBgColor by animateColorAsState(
         targetValue = when {
-            state.isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-            else             -> MaterialTheme.colorScheme.surface
+            state.isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
+            else             -> MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)
         },
         animationSpec = tween(durationMillis = 200),
         label = "cardBg"
@@ -137,7 +137,7 @@ internal fun ConversationListItem(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(20.dp))
                         .background(MaterialTheme.colorScheme.errorContainer)
                         .padding(end = 20.dp),
                     contentAlignment = Alignment.CenterEnd
@@ -157,9 +157,9 @@ internal fun ConversationListItem(
                     .fillMaxWidth()
                     .then(
                         if (hasUnread && !state.isSelected)
-                            Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), RoundedCornerShape(16.dp))
+                            Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
                         else
-                            Modifier
+                            Modifier.border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f), RoundedCornerShape(20.dp))
                     )
                     .combinedClickable(
                         onClick = {
@@ -171,7 +171,7 @@ internal fun ConversationListItem(
                             callbacks.onLongClick()
                         }
                     ),
-                shape  = RoundedCornerShape(16.dp),
+                shape  = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = cardBgColor),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
