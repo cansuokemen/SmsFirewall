@@ -53,8 +53,10 @@ internal fun NotificationWarningCard(onOpenSettings: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 12.dp),
-        shape  = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+        shape  = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.92f)
+        )
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
