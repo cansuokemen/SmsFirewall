@@ -5,6 +5,22 @@
     <string name="tab_messages">Mesajlar</string>
     <string name="tab_spam">Spam</string>
 
+    <!-- Filters -->
+    <string name="filter_all">Tümü</string>
+    <string name="filter_unread">Okunmamış</string>
+    <string name="filter_favorites">Favoriler</string>
+
+    <!-- Selection actions -->
+    <string name="action_pin">Sabitle</string>
+    <string name="action_favorite">Favoriye Ekle</string>
+    <string name="action_mute">Sessize Al</string>
+    <string name="action_archive">Arşivle</string>
+    <string name="cd_pin">Sabitle</string>
+    <string name="cd_favorite">Favoriye ekle</string>
+    <string name="cd_archive">Arşivle</string>
+    <string name="cd_pinned">Sabitlenmiş</string>
+    <string name="cd_favorited">Favori</string>
+
     <!-- Search -->
     <string name="search_placeholder">Kelime veya numara ara</string>
 

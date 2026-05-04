@@ -1,6 +1,7 @@
 package com.example.smsfirewall.di
 
 import android.content.Context
+import com.example.smsfirewall.data.ConversationMetaStore
 import com.example.smsfirewall.data.SpamRetentionPreferenceStore
 import com.example.smsfirewall.data.background.BackgroundImageRepository
 import com.example.smsfirewall.data.background.BackgroundPreferenceStore
@@ -59,5 +60,11 @@ object AppModule {
     @Singleton
     fun provideBackgroundImageRepository(@ApplicationContext context: Context): BackgroundImageRepository {
         return BackgroundImageRepository(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideConversationMetaStore(@ApplicationContext context: Context): ConversationMetaStore {
+        return ConversationMetaStore(context)
     }
 }

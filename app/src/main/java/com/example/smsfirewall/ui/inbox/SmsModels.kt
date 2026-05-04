@@ -14,12 +14,21 @@ enum class InboxTab(val titleResId: Int) {
     SPAM(R.string.tab_spam)
 }
 
+enum class MessagesFilter(val titleResId: Int) {
+    ALL(R.string.filter_all),
+    UNREAD(R.string.filter_unread),
+    FAVORITES(R.string.filter_favorites)
+}
+
 data class SmsConversation(
     val senderKey: String,
     val displaySender: String,
     val messages: List<SmsEntity>,
     val latestReceivedAt: Long,
-    val unreadCount: Int = 0
+    val unreadCount: Int = 0,
+    val isPinned: Boolean = false,
+    val isFavorite: Boolean = false,
+    val isArchived: Boolean = false
 )
 
 data class SystemMessagesResult(
