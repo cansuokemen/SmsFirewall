@@ -37,18 +37,30 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.geometry.Offset
@@ -97,8 +109,34 @@ internal fun ConversationDetailScreen(
 
     val sendButtonScale by animateFloatAsState(
         targetValue   = if (draftMessage.isNotBlank()) 1f else 0.88f,
-        animationSpec = tween(200),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
         label         = "sendScale"
+    )
+    val sendButtonRotation by animateFloatAsState(
+        targetValue   = if (draftMessage.isNotBlank()) -25f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+        label         = "sendRotation"
+    )
+    val sendButtonColor by animateColorAsState(
+        targetValue   = if (draftMessage.isNotBlank()) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant,
+        animationSpec = tween(220),
+        label         = "sendColor"
+    )
+    val sendIconColor by animateColorAsState(
+        targetValue   = if (draftMessage.isNotBlank()) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+        animationSpec = tween(220),
+        label         = "sendIconColor"
+    )
+    val launchAnim = remember { Animatable(0f) }
+    val inputInteractionSource = remember { MutableInteractionSource() }
+    val isInputFocused by inputInteractionSource.collectIsFocusedAsState()
+    val inputBorderColor by animateColorAsState(
+        targetValue   = if (isInputFocused) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+        animationSpec = tween(250),
+        label         = "inputBorder"
     )
 
     val displayName   = contactName ?: conversation.displaySender
@@ -128,12 +166,18 @@ internal fun ConversationDetailScreen(
         if (isKeyboardVisible && displayMessages.isNotEmpty()) listState.animateScrollToItem(0)
     }
 
+    val coroutineScope = rememberCoroutineScope()
     fun submitMessage() {
         if (!canSendMessage) return
         val text = draftMessage.trim()
         if (text.isBlank()) return
         callbacks.onSendMessage(text)
         draftMessage = ""
+        coroutineScope.launch {
+            launchAnim.snapTo(0f)
+            launchAnim.animateTo(1f, animationSpec = tween(durationMillis = 140))
+            launchAnim.animateTo(0f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium))
+        }
     }
 
     val handleBack = {
@@ -272,10 +316,26 @@ internal fun ConversationDetailScreen(
 
                 if (dateHeader != nextDateHeader) {
                     item(key = "date_header_$index") {
+                        val headerScale = remember(dateHeader) { Animatable(0.8f) }
+                        val headerAlpha = remember(dateHeader) { Animatable(0f) }
+                        LaunchedEffect(dateHeader) {
+                            headerAlpha.animateTo(1f, animationSpec = tween(280))
+                        }
+                        LaunchedEffect(dateHeader) {
+                            headerScale.animateTo(
+                                targetValue   = 1f,
+                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+                            )
+                        }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp),
+                                .padding(vertical = 8.dp)
+                                .graphicsLayer {
+                                    scaleX = headerScale.value
+                                    scaleY = headerScale.value
+                                    alpha  = headerAlpha.value
+                                },
                             horizontalArrangement = Arrangement.Center
                         ) {
                             Text(
@@ -319,13 +379,14 @@ internal fun ConversationDetailScreen(
                                 true
                             } else false
                         },
+                    interactionSource = inputInteractionSource,
                     singleLine  = true,
                     shape       = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor   = MaterialTheme.colorScheme.surfaceVariant,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        focusedBorderColor      = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor    = Color.Transparent
+                        focusedBorderColor      = inputBorderColor,
+                        unfocusedBorderColor    = inputBorderColor
                     ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(
@@ -341,16 +402,29 @@ internal fun ConversationDetailScreen(
                 FilledIconButton(
                     onClick  = { submitMessage(); keyboardController?.hide() },
                     enabled  = draftMessage.isNotBlank(),
-                    modifier = Modifier.size(48.dp).scale(sendButtonScale),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .graphicsLayer {
+                            scaleX = sendButtonScale
+                            scaleY = sendButtonScale
+                            rotationZ = sendButtonRotation
+                        },
                     shape    = CircleShape,
                     colors   = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor   = MaterialTheme.colorScheme.onPrimary
+                        containerColor         = sendButtonColor,
+                        contentColor           = sendIconColor,
+                        disabledContainerColor = sendButtonColor,
+                        disabledContentColor   = sendIconColor
                     )
                 ) {
                     Icon(
                         imageVector        = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = stringResource(R.string.cd_send)
+                        contentDescription = stringResource(R.string.cd_send),
+                        modifier = Modifier.graphicsLayer {
+                            translationX = 14f * this.density * launchAnim.value
+                            translationY = -10f * this.density * launchAnim.value
+                            alpha = 1f - 0.5f * launchAnim.value
+                        }
                     )
                 }
             }

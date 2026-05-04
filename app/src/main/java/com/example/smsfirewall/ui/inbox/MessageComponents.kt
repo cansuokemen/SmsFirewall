@@ -1,5 +1,9 @@
 package com.example.smsfirewall.ui.inbox
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -20,12 +24,17 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,6 +48,8 @@ private val OutgoingBubbleShape = RoundedCornerShape(
 private val IncomingBubbleShape = RoundedCornerShape(
     topStart = 6.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 20.dp
 )
+private val LeftOrigin  = TransformOrigin(0f, 1f)
+private val RightOrigin = TransformOrigin(1f, 1f)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -51,6 +62,33 @@ internal fun DetailMessageBubble(
     val isOutgoing = sms.reason == SENT_MESSAGE_REASON
     val bubbleShape = if (isOutgoing) OutgoingBubbleShape else IncomingBubbleShape
     val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
+
+    val scaleAnim       = remember(sms.id) { Animatable(0.85f) }
+    val translateXAnim  = remember(sms.id) { Animatable(if (isOutgoing) 60f else -40f) }
+    val translateYAnim  = remember(sms.id) { Animatable(24f) }
+    val alphaAnim       = remember(sms.id) { Animatable(0f) }
+    LaunchedEffect(sms.id) {
+        alphaAnim.animateTo(1f, animationSpec = tween(durationMillis = 220))
+    }
+    LaunchedEffect(sms.id) {
+        scaleAnim.animateTo(
+            targetValue   = 1f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+        )
+    }
+    LaunchedEffect(sms.id) {
+        translateXAnim.animateTo(
+            targetValue   = 0f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
+        )
+    }
+    LaunchedEffect(sms.id) {
+        translateYAnim.animateTo(
+            targetValue   = 0f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+        )
+    }
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -59,6 +97,15 @@ internal fun DetailMessageBubble(
         Column(
             modifier = Modifier
                 .widthIn(max = 280.dp)
+                .graphicsLayer {
+                    val s = scaleAnim.value
+                    scaleX            = s
+                    scaleY            = s
+                    alpha             = alphaAnim.value
+                    translationX      = translateXAnim.value * density.density
+                    translationY      = translateYAnim.value * density.density
+                    transformOrigin   = if (isOutgoing) RightOrigin else LeftOrigin
+                }
                 .then(
                     if (isOutgoing) Modifier.shadow(3.dp, bubbleShape, clip = false)
                     else Modifier
@@ -173,10 +220,24 @@ internal fun SpamMessageActionRow(
 internal fun SwipeActionButton(
     icon: ImageVector,
     contentDescription: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    index: Int = 0
 ) {
+    val scale = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(index * 60L)
+        scale.animateTo(
+            targetValue   = 1f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+        )
+    }
     IconButton(
-        modifier = Modifier.size(44.dp),
+        modifier = Modifier
+            .size(44.dp)
+            .graphicsLayer {
+                scaleX = scale.value
+                scaleY = scale.value
+            },
         onClick  = onClick
     ) {
         Icon(

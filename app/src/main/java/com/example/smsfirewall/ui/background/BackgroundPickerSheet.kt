@@ -3,22 +3,31 @@ package com.example.smsfirewall.ui.background
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -37,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,7 +56,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -54,6 +66,7 @@ import com.example.smsfirewall.R
 import com.example.smsfirewall.data.background.BackgroundImageRepository
 import com.example.smsfirewall.data.background.BackgroundPresets
 import com.example.smsfirewall.data.background.BackgroundSpec
+import com.example.smsfirewall.ui.animation.MorphingCheckmark
 import kotlinx.coroutines.launch
 
 private enum class BackgroundCategory { Gradient, Pattern, Solid, Image }
@@ -180,21 +193,45 @@ private fun CategoryChips(
     category: BackgroundCategory,
     onSelect: (BackgroundCategory) -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        CategoryChip(stringResource(R.string.background_cat_gradient), category == BackgroundCategory.Gradient) {
-            onSelect(BackgroundCategory.Gradient)
+    val entries = BackgroundCategory.entries
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val totalWidth = maxWidth
+        val gap        = 8.dp
+        val chipWidth  = (totalWidth - gap * (entries.size - 1)) / entries.size
+        val density    = LocalDensity.current
+        val targetIndex = entries.indexOf(category)
+        val indicatorOffset = remember { Animatable(0f) }
+        LaunchedEffect(targetIndex) {
+            val targetPx = with(density) { ((chipWidth + gap) * targetIndex).toPx() }
+            indicatorOffset.animateTo(
+                targetValue   = targetPx,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+            )
         }
-        CategoryChip(stringResource(R.string.background_cat_pattern), category == BackgroundCategory.Pattern) {
-            onSelect(BackgroundCategory.Pattern)
-        }
-        CategoryChip(stringResource(R.string.background_cat_solid), category == BackgroundCategory.Solid) {
-            onSelect(BackgroundCategory.Solid)
-        }
-        CategoryChip(stringResource(R.string.background_cat_image), category == BackgroundCategory.Image) {
-            onSelect(BackgroundCategory.Image)
+        Column {
+            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                entries.forEach { cat ->
+                    val label = when (cat) {
+                        BackgroundCategory.Gradient -> R.string.background_cat_gradient
+                        BackgroundCategory.Pattern  -> R.string.background_cat_pattern
+                        BackgroundCategory.Solid    -> R.string.background_cat_solid
+                        BackgroundCategory.Image    -> R.string.background_cat_image
+                    }
+                    Box(modifier = Modifier.size(width = chipWidth, height = 36.dp)) {
+                        CategoryChip(stringResource(label), category == cat) { onSelect(cat) }
+                    }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Box(modifier = Modifier.fillMaxWidth().height(3.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(width = chipWidth, height = 3.dp)
+                        .graphicsLayer { translationX = indicatorOffset.value }
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            }
         }
     }
 }
@@ -223,40 +260,56 @@ private fun GradientGrid(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items(BackgroundPresets.gradients, key = { it.id }) { preset ->
+        itemsIndexed(BackgroundPresets.gradients, key = { _, item -> item.id }) { index, preset ->
             val brush = remember(preset.id) { BackgroundPresets.gradientBrush(preset.id) }
             val isSelected = preset.id == selectedId
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(brush)
-                        .border(
-                            width = if (isSelected) 2.dp else 0.5.dp,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(16.dp)
-                        )
-                        .clickable { onSelect(BackgroundSpec.Gradient(preset.id)) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isSelected) {
-                        Icon(
-                            imageVector = Icons.Outlined.Check,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
+            StaggeredEntry(index = index) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(brush)
+                            .border(
+                                width = if (isSelected) 2.dp else 0.5.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .clickable { onSelect(BackgroundSpec.Gradient(preset.id)) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        MorphingCheckmark(visible = isSelected, size = 28.dp)
                     }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = preset.displayName,
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = preset.displayName,
-                    style = MaterialTheme.typography.labelSmall
-                )
             }
         }
+    }
+}
+
+@Composable
+private fun StaggeredEntry(index: Int, content: @Composable () -> Unit) {
+    val scale = remember { Animatable(0.6f) }
+    val alpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(index.coerceAtMost(8) * 45L)
+        launch { scale.animateTo(1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) }
+        launch { alpha.animateTo(1f, animationSpec = tween(280)) }
+    }
+    Box(
+        modifier = Modifier.graphicsLayer {
+            scaleX = scale.value
+            scaleY = scale.value
+            this.alpha = alpha.value
+        }
+    ) {
+        content()
     }
 }
 
@@ -271,48 +324,39 @@ private fun PatternGrid(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items(BackgroundPresets.patterns, key = { it.id }) { preset ->
+        itemsIndexed(BackgroundPresets.patterns, key = { _, item -> item.id }) { index, preset ->
             val isSelected = preset.id == selectedId
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(90.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .border(
-                            width = if (isSelected) 2.dp else 0.5.dp,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(16.dp)
-                        )
-                        .clickable { onSelect(BackgroundSpec.Pattern(preset.id)) }
-                ) {
-                    AppBackground(spec = BackgroundSpec.Pattern(preset.id)) { }
-                    if (isSelected) {
+            StaggeredEntry(index = index) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(90.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(
+                                width = if (isSelected) 2.dp else 0.5.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .clickable { onSelect(BackgroundSpec.Pattern(preset.id)) }
+                    ) {
+                        AppBackground(spec = BackgroundSpec.Pattern(preset.id)) { }
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(6.dp)
-                                .size(24.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary),
-                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            MorphingCheckmark(visible = isSelected, size = 24.dp)
                         }
                     }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = preset.displayName,
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = preset.displayName,
-                    style = MaterialTheme.typography.labelSmall
-                )
             }
         }
     }
@@ -329,30 +373,26 @@ private fun SolidGrid(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items(BackgroundPresets.solidPalette) { color ->
+        itemsIndexed(BackgroundPresets.solidPalette) { index, color ->
             val argb = color.toArgbLong()
             val isSelected = argb == selectedArgb
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(color)
-                    .border(
-                        width = if (isSelected) 2.dp else 0.5.dp,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                        shape = RoundedCornerShape(14.dp)
-                    )
-                    .clickable { onSelect(BackgroundSpec.SolidColor(argb)) },
-                contentAlignment = Alignment.Center
-            ) {
-                if (isSelected) {
-                    Icon(
-                        imageVector = Icons.Outlined.Check,
-                        contentDescription = null,
-                        tint = Color.White
-                    )
+            StaggeredEntry(index = index) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(color)
+                        .border(
+                            width = if (isSelected) 2.dp else 0.5.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                        .clickable { onSelect(BackgroundSpec.SolidColor(argb)) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    MorphingCheckmark(visible = isSelected, size = 24.dp)
                 }
             }
         }
@@ -420,7 +460,14 @@ private fun PreviewStrip(spec: BackgroundSpec) {
                 RoundedCornerShape(16.dp)
             )
     ) {
-        AppBackground(spec = spec) { }
+        Crossfade(
+            targetState   = spec,
+            animationSpec = tween(durationMillis = 320),
+            label         = "previewCrossfade",
+            modifier      = Modifier.fillMaxSize()
+        ) { current ->
+            AppBackground(spec = current) { }
+        }
     }
 }
 

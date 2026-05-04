@@ -1,11 +1,19 @@
 package com.example.smsfirewall.ui.background
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -15,6 +23,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
@@ -38,9 +47,17 @@ fun AppBackground(
     content: @Composable BoxScope.() -> Unit
 ) {
     Box(modifier = modifier.fillMaxSize()) {
-        BackgroundLayer(spec = spec, isDark = isDark)
-        if (spec is BackgroundSpec.CustomImage || spec is BackgroundSpec.Pattern) {
-            ReadabilityScrim()
+        Crossfade(
+            targetState   = spec,
+            animationSpec = tween(durationMillis = 520),
+            label         = "bgCrossfade"
+        ) { current ->
+            Box(Modifier.fillMaxSize()) {
+                BackgroundLayer(spec = current, isDark = isDark)
+                if (current is BackgroundSpec.CustomImage || current is BackgroundSpec.Pattern) {
+                    ReadabilityScrim()
+                }
+            }
         }
         content()
     }
@@ -56,7 +73,28 @@ private fun BackgroundLayer(spec: BackgroundSpec, isDark: Boolean) {
             val brush = remember(spec.presetId, isDark) {
                 BackgroundPresets.gradientBrush(spec.presetId, dark = isDark)
             }
-            Box(Modifier.fillMaxSize().background(brush))
+            val driftTransition = rememberInfiniteTransition(label = "gradDrift")
+            val driftPhase by driftTransition.animateFloat(
+                initialValue   = 0f,
+                targetValue    = 1f,
+                animationSpec  = infiniteRepeatable(
+                    animation  = tween(durationMillis = 14000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "gradDriftPhase"
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        // Hafif yukarı-aşağı + sağa-sola kayma
+                        translationY = (driftPhase - 0.5f) * size.height * 0.10f
+                        translationX = (driftPhase - 0.5f) * size.width * 0.06f
+                        scaleX       = 1.18f
+                        scaleY       = 1.18f
+                    }
+                    .background(brush)
+            )
         }
         is BackgroundSpec.SolidColor -> Box(
             Modifier.fillMaxSize().background(Color(spec.argb))
