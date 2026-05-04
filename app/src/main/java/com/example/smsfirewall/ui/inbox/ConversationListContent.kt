@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -170,17 +171,32 @@ internal fun ConversationListContent(
                 enter   = slideInVertically(initialOffsetY = { -it }) + fadeIn(tween(200)),
                 exit    = slideOutVertically(targetOffsetY = { -it }) + fadeOut(tween(200))
             ) {
-                NormalHeader(onOpenSettings = { viewModel.openSettings() })
+                val totalCount = remember(filteredConversations) { filteredConversations.size }
+                val unreadStat = remember(filteredConversations) { filteredConversations.count { it.unreadCount > 0 } }
+                val favStat    = remember(filteredConversations) { filteredConversations.count { it.isFavorite } }
+                val spamStat   = remember(filteredConversations) { filteredConversations.count { it.messages.any { m -> m.reason.contains("spam", ignoreCase = true) || m.reason.contains("block", ignoreCase = true) } } }
+                NormalHeader(
+                    onOpenSettings = { viewModel.openSettings() },
+                    totalConversations = totalCount,
+                    unreadCount = unreadStat,
+                    spamCount = spamStat,
+                    favoriteCount = favStat
+                )
             }
 
             if (viewModel.shouldShowNotificationWarning) {
                 NotificationWarningCard(onOpenSettings = openNotificationSettings)
             }
 
-            // Tab row with icons
+            // Tab row with icons — surface background for contrast over Aurora
             PrimaryTabRow(
                 selectedTabIndex = viewModel.selectedTab.ordinal,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .shadow(2.dp, RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)),
                 containerColor = Color.Transparent,
                 contentColor = MaterialTheme.colorScheme.primary
             ) {
@@ -275,10 +291,7 @@ internal fun ConversationListContent(
                                         viewModel.actionRevealedConversationKey = null
                                     }
                                 },
-                                onSwipeDeleteConversation = {
-                                    conversation.messages.lastOrNull()?.let { viewModel.beginCrumpleAnim(it) }
-                                    viewModel.deleteConversation(conversation)
-                                },
+                                onSwipeDeleteConversation = { viewModel.deleteConversation(conversation) },
                                 onMuteNotifications = {
                                     viewModel.muteNotifications(conversation.displaySender)
                                     Toast.makeText(context, context.getString(R.string.notifications_muted), Toast.LENGTH_SHORT).show()
@@ -476,39 +489,95 @@ private fun MessagesFilterChipRow(
 }
 
 @Composable
-private fun NormalHeader(onOpenSettings: () -> Unit) {
+private fun NormalHeader(
+    onOpenSettings: () -> Unit,
+    totalConversations: Int,
+    unreadCount: Int,
+    spamCount: Int,
+    favoriteCount: Int
+) {
     val haptic = LocalHapticFeedback.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, top = 16.dp, end = 12.dp, bottom = 8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text       = stringResource(R.string.app_name),
+                style      = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Black,
+                color      = MaterialTheme.colorScheme.onSurface,
+                modifier   = Modifier
+                    .weight(1f)
+                    .graphicsLayer { shadowElevation = 6f }
+            )
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .shadow(4.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onOpenSettings()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector        = Icons.Outlined.Settings,
+                    contentDescription = stringResource(R.string.cd_settings),
+                    tint               = MaterialTheme.colorScheme.onSurface,
+                    modifier           = Modifier.size(22.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.padding(top = 12.dp))
+        InboxStatsRow(
+            total      = totalConversations,
+            unread     = unreadCount,
+            favorites  = favoriteCount,
+            spam       = spamCount
+        )
+    }
+}
+
+@Composable
+private fun InboxStatsRow(total: Int, unread: Int, favorites: Int, spam: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, top = 20.dp, end = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(end = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        StatChip(label = stringResource(R.string.stats_total),     value = total,     modifier = Modifier.weight(1f))
+        StatChip(label = stringResource(R.string.stats_unread),    value = unread,    modifier = Modifier.weight(1f))
+        StatChip(label = stringResource(R.string.stats_favorites), value = favorites, modifier = Modifier.weight(1f))
+        StatChip(label = stringResource(R.string.stats_spam),      value = spam,      modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun StatChip(label: String, value: Int, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .shadow(3.dp, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f))
+            .padding(vertical = 8.dp, horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text       = stringResource(R.string.app_name),
-            style      = MaterialTheme.typography.headlineMedium,
+            text = value.toString(),
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.ExtraBold,
-            color      = MaterialTheme.colorScheme.primary,
-            modifier   = Modifier.weight(1f)
+            color = MaterialTheme.colorScheme.primary
         )
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clickable {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onOpenSettings()
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector        = Icons.Outlined.Settings,
-                contentDescription = stringResource(R.string.cd_settings),
-                tint               = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier           = Modifier.size(20.dp)
-            )
-        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
+        )
     }
 }
 
@@ -650,8 +719,9 @@ private fun InboxTabItem(tab: InboxTab, selected: Boolean, onClick: () -> Unit) 
             )
             Text(
                 text  = stringResource(tab.titleResId),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
             )
         }
     }

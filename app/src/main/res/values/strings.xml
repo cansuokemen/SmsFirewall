@@ -10,6 +10,12 @@
     <string name="filter_unread">Okunmamış</string>
     <string name="filter_favorites">Favoriler</string>
 
+    <!-- Stats -->
+    <string name="stats_total">Toplam</string>
+    <string name="stats_unread">Okunmamış</string>
+    <string name="stats_favorites">Favori</string>
+    <string name="stats_spam">Spam</string>
+
     <!-- Selection actions -->
     <string name="action_pin">Sabitle</string>
     <string name="action_favorite">Favoriye Ekle</string>
