@@ -13,16 +13,21 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.launch
 import com.example.smsfirewall.ui.inbox.BlockedSmsScreen
 import com.example.smsfirewall.ui.inbox.InboxViewModel
 import com.example.smsfirewall.ui.theme.ThemePreferenceStore
@@ -130,11 +135,22 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             var themeMode by remember { mutableStateOf(themePreferenceStore.getThemeMode()) }
+            val launchScale = remember { Animatable(1.06f) }
+            val launchAlpha = remember { Animatable(0f) }
+            LaunchedEffect(Unit) {
+                launch { launchScale.animateTo(1f, animationSpec = tween(durationMillis = 460)) }
+                launch { launchAlpha.animateTo(1f, animationSpec = tween(durationMillis = 380)) }
+            }
             SmsFirewallTheme(themeMode = themeMode) {
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
                         .windowInsetsPadding(WindowInsets.safeDrawing)
+                        .graphicsLayer {
+                            scaleX = launchScale.value
+                            scaleY = launchScale.value
+                            alpha  = launchAlpha.value
+                        }
                 ) {
                     BlockedSmsScreen(
                         viewModel = inboxViewModel,

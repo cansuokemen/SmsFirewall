@@ -1,5 +1,6 @@
 package com.example.smsfirewall.ui.inbox
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -24,11 +25,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +57,26 @@ internal fun EmptyStateView(
         ),
         label = "breathScale"
     )
+    val swayRotation by breathTransition.animateFloat(
+        initialValue   = -6f,
+        targetValue    = 6f,
+        animationSpec  = infiniteRepeatable(
+            animation  = tween(2800, easing = EaseInOut),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "iconSway"
+    )
+
+    val titleAlpha    = remember { Animatable(0f) }
+    val subtitleAlpha = remember { Animatable(0f) }
+    LaunchedEffect(title) {
+        kotlinx.coroutines.delay(150L)
+        titleAlpha.animateTo(1f, animationSpec = tween(durationMillis = 400))
+    }
+    LaunchedEffect(subtitle) {
+        kotlinx.coroutines.delay(320L)
+        subtitleAlpha.animateTo(1f, animationSpec = tween(durationMillis = 400))
+    }
 
     Column(
         modifier = modifier
@@ -65,7 +89,11 @@ internal fun EmptyStateView(
         Box(
             modifier = Modifier
                 .size(100.dp)
-                .scale(breathScale)
+                .graphicsLayer {
+                    scaleX    = breathScale
+                    scaleY    = breathScale
+                    rotationZ = swayRotation
+                }
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
             contentAlignment = Alignment.Center
@@ -83,14 +111,16 @@ internal fun EmptyStateView(
             style      = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color      = MaterialTheme.colorScheme.onSurface,
-            textAlign  = TextAlign.Center
+            textAlign  = TextAlign.Center,
+            modifier   = Modifier.graphicsLayer { alpha = titleAlpha.value }
         )
         Spacer(Modifier.height(8.dp))
         Text(
             text      = subtitle,
             style     = MaterialTheme.typography.bodyMedium,
             color     = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            modifier  = Modifier.graphicsLayer { alpha = subtitleAlpha.value }
         )
     }
 }

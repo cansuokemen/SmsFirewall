@@ -78,6 +78,7 @@ import androidx.compose.foundation.border
 import com.example.smsfirewall.R
 import com.example.smsfirewall.data.SpamRetentionPreferenceStore
 import com.example.smsfirewall.data.background.BackgroundSpec
+import com.example.smsfirewall.ui.animation.SectionEntry
 import com.example.smsfirewall.ui.background.AppBackground
 import com.example.smsfirewall.ui.theme.ThemeMode
 
@@ -146,6 +147,8 @@ fun SettingsScreen(
         ) {
             // ── Tema ──────────────────────────────────────
             item {
+                SectionEntry(index = 0) {
+                Column {
                 Spacer(Modifier.height(8.dp))
                 SectionHeader(
                     title       = stringResource(R.string.theme),
@@ -183,10 +186,14 @@ fun SettingsScreen(
                     }
                 }
                 Spacer(Modifier.height(24.dp))
+                }
+                }
             }
 
             // ── Ana menü arka planı ───────────────────────
             item {
+                SectionEntry(index = 1) {
+                Column {
                 SectionHeader(
                     title       = stringResource(R.string.background_section_title),
                     description = stringResource(R.string.background_section_description),
@@ -254,10 +261,14 @@ fun SettingsScreen(
                     }
                 }
                 Spacer(Modifier.height(24.dp))
+                }
+                }
             }
 
             // ── Bildirim Tercihleri ───────────────────────
             item {
+                SectionEntry(index = 2) {
+                Column {
                 SectionHeader(
                     title       = stringResource(R.string.notification_preferences),
                     description = stringResource(R.string.notification_preferences_description),
@@ -313,10 +324,14 @@ fun SettingsScreen(
                     }
                 }
                 Spacer(Modifier.height(24.dp))
+                }
+                }
             }
 
             // ── Spam Saklama Süresi ───────────────────────
             item {
+                SectionEntry(index = 3) {
+                Column {
                 SectionHeader(
                     title       = stringResource(R.string.spam_retention),
                     description = stringResource(R.string.spam_retention_description),
@@ -339,10 +354,14 @@ fun SettingsScreen(
                     }
                 }
                 Spacer(Modifier.height(24.dp))
+                }
+                }
             }
 
             // ── Engellenen Numaralar ──────────────────────
             item {
+                SectionEntry(index = 4) {
+                Column {
                 SectionHeader(
                     title       = stringResource(R.string.blocked_numbers),
                     description = stringResource(R.string.blocked_numbers_description),
@@ -357,6 +376,8 @@ fun SettingsScreen(
                     }
                 )
                 Spacer(Modifier.height(12.dp))
+                }
+                }
             }
 
             if (blockedSenders.isEmpty()) {

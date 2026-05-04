@@ -2,7 +2,12 @@ package com.example.smsfirewall.ui.inbox
 
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,15 +24,24 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
 import com.example.smsfirewall.data.local.SmsEntity
+import com.example.smsfirewall.ui.animation.shake
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun MessageOptionsDialog(
@@ -45,57 +59,11 @@ internal fun MessageOptionsDialog(
         title = { Text(text = stringResource(R.string.message_options)) },
         text = {
             Column {
-                TextButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onCopy(sms)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Start,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.ContentCopy,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(text = stringResource(R.string.copy_message))
-                    }
-                }
-                TextButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onDelete(sms)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Start,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Delete,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = stringResource(R.string.delete_message),
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-                if (onBlockSender != null) {
+                DialogActionRow(index = 0) {
                     TextButton(
                         onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onBlockSender(sms)
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onCopy(sms)
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -105,16 +73,68 @@ internal fun MessageOptionsDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.Block,
+                                imageVector = Icons.Outlined.ContentCopy,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(text = stringResource(R.string.copy_message))
+                        }
+                    }
+                }
+                DialogActionRow(index = 1) {
+                    TextButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onDelete(sms)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Start,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Delete,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = stringResource(R.string.block_sender),
+                                text = stringResource(R.string.delete_message),
                                 color = MaterialTheme.colorScheme.error
                             )
+                        }
+                    }
+                }
+                if (onBlockSender != null) {
+                    DialogActionRow(index = 2) {
+                        TextButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onBlockSender(sms)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Start,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Block,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = stringResource(R.string.block_sender),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
                 }
@@ -127,6 +147,31 @@ internal fun MessageOptionsDialog(
             }
         }
     )
+}
+
+@Composable
+private fun DialogActionRow(index: Int, content: @Composable () -> Unit) {
+    val offset = remember { Animatable(40f) }
+    val alpha  = remember { Animatable(0f) }
+    val density = LocalDensity.current
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(index * 60L)
+        launch {
+            offset.animateTo(
+                targetValue   = 0f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+            )
+        }
+        launch { alpha.animateTo(1f, animationSpec = tween(durationMillis = 240)) }
+    }
+    Box(
+        modifier = Modifier.graphicsLayer {
+            translationX = offset.value * density.density
+            this.alpha   = alpha.value
+        }
+    ) {
+        content()
+    }
 }
 
 @Composable
@@ -157,16 +202,21 @@ internal fun BatchDeleteConfirmDialog(
 ) {
     if (!show) return
     val haptic = LocalHapticFeedback.current
+    var shakeKey by remember { mutableIntStateOf(0) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.delete_selected)) },
         text = { Text(text = stringResource(R.string.delete_selected_confirm, count)) },
         confirmButton = {
-            TextButton(onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onConfirm()
-            }) {
+            TextButton(
+                modifier = Modifier.shake(trigger = if (shakeKey > 0) shakeKey else null),
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    shakeKey++
+                    onConfirm()
+                }
+            ) {
                 Text(
                     text = stringResource(R.string.delete),
                     color = MaterialTheme.colorScheme.error
@@ -190,6 +240,7 @@ internal fun BlockSenderConfirmDialog(
 ) {
     if (!show) return
     val haptic = LocalHapticFeedback.current
+    var shakeKey by remember { mutableIntStateOf(0) }
 
     val message = if (senderNames.size == 1) {
         stringResource(R.string.block_confirm_message, senderNames.first())
@@ -202,10 +253,14 @@ internal fun BlockSenderConfirmDialog(
         title = { Text(text = stringResource(R.string.block_confirm_title)) },
         text = { Text(text = message) },
         confirmButton = {
-            TextButton(onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onConfirm()
-            }) {
+            TextButton(
+                modifier = Modifier.shake(trigger = if (shakeKey > 0) shakeKey else null),
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    shakeKey++
+                    onConfirm()
+                }
+            ) {
                 Text(
                     text = stringResource(R.string.block),
                     color = MaterialTheme.colorScheme.error
