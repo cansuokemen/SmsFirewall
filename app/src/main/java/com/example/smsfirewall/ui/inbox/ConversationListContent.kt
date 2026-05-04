@@ -5,12 +5,16 @@ import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,6 +31,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -34,13 +39,21 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Deselect
 import androidx.compose.material.icons.outlined.MailOutline
+import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -52,14 +65,18 @@ import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -134,6 +151,10 @@ internal fun ConversationListContent(
                         if (allSelected) viewModel.deselectAll()
                         else viewModel.selectAll(filteredConversations.map { it.senderKey }.toSet())
                     },
+                    onPin = { viewModel.togglePinSelected(filteredConversations) },
+                    onFavorite = { viewModel.toggleFavoriteSelected(filteredConversations) },
+                    onMute = { viewModel.toggleMuteSelected(filteredConversations) },
+                    onArchive = { viewModel.archiveSelected(filteredConversations) },
                     onBlock = {
                         viewModel.pendingBlockSenders = filteredConversations
                             .filter { it.senderKey in viewModel.selectedConversationKeys }
@@ -172,6 +193,17 @@ internal fun ConversationListContent(
                 }
             }
 
+            AnimatedVisibility(
+                visible = viewModel.selectedTab == InboxTab.MESSAGES && !viewModel.isSelectionMode,
+                enter   = fadeIn(tween(220)) + slideInVertically(initialOffsetY = { -it / 2 }),
+                exit    = fadeOut(tween(160)) + slideOutVertically(targetOffsetY = { -it / 2 })
+            ) {
+                MessagesFilterChipRow(
+                    current  = viewModel.messagesFilter,
+                    onChange = { viewModel.selectMessagesFilter(it) }
+                )
+            }
+
             if (viewModel.selectedTab == InboxTab.SPAM) {
                 SpamAutoDeleteWarningCard(retentionDays = viewModel.spamRetentionDays)
             }
@@ -197,6 +229,7 @@ internal fun ConversationListContent(
                         else                                            -> SpamEmptyState()
                     }
                 } else {
+                    val firstAppearTimeMs = remember(viewModel.selectedTab) { System.currentTimeMillis() }
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
@@ -205,7 +238,7 @@ internal fun ConversationListContent(
                         state = conversationListState,
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        items(filteredConversations, key = { it.senderKey }) { conversation ->
+                        itemsIndexed(filteredConversations, key = { _, item -> item.senderKey }) { index, conversation ->
                             val isSenderMuted = remember(conversation.senderKey, viewModel.mutedSendersChangeToken) {
                                 viewModel.mutedSenderStore.isMuted(conversation.displaySender)
                             }
@@ -242,7 +275,10 @@ internal fun ConversationListContent(
                                         viewModel.actionRevealedConversationKey = null
                                     }
                                 },
-                                onSwipeDeleteConversation = { viewModel.deleteConversation(conversation) },
+                                onSwipeDeleteConversation = {
+                                    conversation.messages.lastOrNull()?.let { viewModel.beginCrumpleAnim(it) }
+                                    viewModel.deleteConversation(conversation)
+                                },
                                 onMuteNotifications = {
                                     viewModel.muteNotifications(conversation.displaySender)
                                     Toast.makeText(context, context.getString(R.string.notifications_muted), Toast.LENGTH_SHORT).show()
@@ -256,8 +292,23 @@ internal fun ConversationListContent(
                                     viewModel.showBlockConfirm = true
                                 }
                             )
+                            val isInitialLoad = remember { System.currentTimeMillis() - firstAppearTimeMs < 800L }
+                            val staggerOffset = remember { Animatable(if (isInitialLoad) 60f else 0f) }
+                            val staggerAlpha  = remember { Animatable(if (isInitialLoad) 0f else 1f) }
+                            if (isInitialLoad) {
+                                LaunchedEffect(Unit) {
+                                    kotlinx.coroutines.delay((index.coerceAtMost(8)) * 45L)
+                                    launch { staggerOffset.animateTo(0f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) }
+                                    launch { staggerAlpha.animateTo(1f, animationSpec = tween(280)) }
+                                }
+                            }
                             ConversationListItem(
-                                modifier      = Modifier.animateItem(),
+                                modifier      = Modifier
+                                    .animateItem()
+                                    .graphicsLayer {
+                                        translationY = staggerOffset.value * this.density
+                                        alpha        = staggerAlpha.value
+                                    },
                                 conversation  = conversation,
                                 contactName   = contactName,
                                 state         = itemState,
@@ -298,45 +349,127 @@ private fun SelectionModeHeader(
     allSelected: Boolean,
     onClose: () -> Unit,
     onToggleSelectAll: () -> Unit,
+    onPin: () -> Unit,
+    onFavorite: () -> Unit,
+    onMute: () -> Unit,
+    onArchive: () -> Unit,
     onBlock: () -> Unit,
     onDelete: () -> Unit,
     hasSelection: Boolean
 ) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 4.dp, top = 8.dp, end = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onClose) {
+                Icon(imageVector = Icons.Filled.Close, contentDescription = stringResource(R.string.cd_close_selection))
+            }
+            Text(
+                text       = stringResource(R.string.selected_count, selectedCount),
+                style      = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier   = Modifier.weight(1f)
+            )
+            IconButton(onClick = onToggleSelectAll) {
+                Icon(
+                    imageVector = if (allSelected) Icons.Outlined.Deselect else Icons.Outlined.SelectAll,
+                    contentDescription = stringResource(if (allSelected) R.string.deselect_all else R.string.select_all)
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(start = 4.dp, end = 4.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            IconButton(onClick = onPin, enabled = hasSelection) {
+                Icon(
+                    imageVector = Icons.Outlined.PushPin,
+                    contentDescription = stringResource(R.string.cd_pin),
+                    tint = if (hasSelection) MaterialTheme.colorScheme.primary
+                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                )
+            }
+            IconButton(onClick = onFavorite, enabled = hasSelection) {
+                Icon(
+                    imageVector = Icons.Outlined.StarBorder,
+                    contentDescription = stringResource(R.string.cd_favorite),
+                    tint = if (hasSelection) MaterialTheme.colorScheme.primary
+                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                )
+            }
+            IconButton(onClick = onMute, enabled = hasSelection) {
+                Icon(
+                    imageVector = Icons.Outlined.NotificationsOff,
+                    contentDescription = stringResource(R.string.cd_mute_notifications),
+                    tint = if (hasSelection) MaterialTheme.colorScheme.primary
+                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                )
+            }
+            IconButton(onClick = onArchive, enabled = hasSelection) {
+                Icon(
+                    imageVector = Icons.Outlined.Archive,
+                    contentDescription = stringResource(R.string.cd_archive),
+                    tint = if (hasSelection) MaterialTheme.colorScheme.primary
+                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                )
+            }
+            IconButton(onClick = onBlock, enabled = hasSelection) {
+                Icon(
+                    imageVector = Icons.Outlined.Block,
+                    contentDescription = stringResource(R.string.block_sender),
+                    tint = if (hasSelection) MaterialTheme.colorScheme.error
+                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                )
+            }
+            IconButton(onClick = onDelete, enabled = hasSelection) {
+                Icon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = stringResource(R.string.delete_selected),
+                    tint = if (hasSelection) MaterialTheme.colorScheme.error
+                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MessagesFilterChipRow(
+    current: MessagesFilter,
+    onChange: (MessagesFilter) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 4.dp, top = 8.dp, end = 0.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        IconButton(onClick = onClose) {
-            Icon(imageVector = Icons.Filled.Close, contentDescription = stringResource(R.string.cd_close_selection))
-        }
-        Text(
-            text       = stringResource(R.string.selected_count, selectedCount),
-            style      = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier   = Modifier.weight(1f)
-        )
-        IconButton(onClick = onToggleSelectAll) {
-            Icon(
-                imageVector = if (allSelected) Icons.Outlined.Deselect else Icons.Outlined.SelectAll,
-                contentDescription = stringResource(if (allSelected) R.string.deselect_all else R.string.select_all)
-            )
-        }
-        IconButton(onClick = onBlock, enabled = hasSelection) {
-            Icon(
-                imageVector = Icons.Outlined.Block,
-                contentDescription = stringResource(R.string.block_sender),
-                tint = if (hasSelection) MaterialTheme.colorScheme.error
-                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-            )
-        }
-        IconButton(onClick = onDelete, enabled = hasSelection) {
-            Icon(
-                imageVector = Icons.Outlined.Delete,
-                contentDescription = stringResource(R.string.delete_selected),
-                tint = if (hasSelection) MaterialTheme.colorScheme.error
-                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+        MessagesFilter.entries.forEach { filter ->
+            val selected = current == filter
+            FilterChip(
+                selected = selected,
+                onClick = {
+                    if (current != filter) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onChange(filter)
+                    }
+                },
+                label = { Text(text = stringResource(filter.titleResId)) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor     = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             )
         }
     }
@@ -391,8 +524,14 @@ private fun BottomSearchBar(
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter   = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-        exit    = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        enter   = slideInVertically(
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+            initialOffsetY = { it }
+        ) + fadeIn(tween(220)),
+        exit    = slideOutVertically(
+            animationSpec = tween(220),
+            targetOffsetY = { it }
+        ) + fadeOut(tween(180)),
         modifier = modifier
     ) {
         Row(
@@ -440,9 +579,28 @@ private fun BottomSearchBar(
                 keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() })
             )
             if (showNewMessageFab) {
+                val fabInteractionSource = remember { MutableInteractionSource() }
+                val isFabPressed by fabInteractionSource.collectIsPressedAsState()
+                val fabScale by animateFloatAsState(
+                    targetValue   = if (isFabPressed) 0.88f else 1f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                    label         = "fabScale"
+                )
+                val fabRotation by animateFloatAsState(
+                    targetValue   = if (isFabPressed) 18f else 0f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
+                    label         = "fabRotate"
+                )
                 FloatingActionButton(
                     onClick        = onNewMessage,
-                    modifier       = Modifier.size(52.dp),
+                    interactionSource = fabInteractionSource,
+                    modifier       = Modifier
+                        .size(52.dp)
+                        .graphicsLayer {
+                            scaleX    = fabScale
+                            scaleY    = fabScale
+                            rotationZ = fabRotation
+                        },
                     shape          = CircleShape,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor   = MaterialTheme.colorScheme.onPrimary
@@ -464,6 +622,11 @@ private fun InboxTabItem(tab: InboxTab, selected: Boolean, onClick: () -> Unit) 
         animationSpec = tween(200),
         label         = "tabIconSize"
     )
+    val iconRotation by animateFloatAsState(
+        targetValue   = if (selected) 360f else 0f,
+        animationSpec = tween(durationMillis = 450),
+        label         = "tabIconRotate"
+    )
     Tab(
         selected = selected,
         onClick  = onClick,
@@ -481,7 +644,9 @@ private fun InboxTabItem(tab: InboxTab, selected: Boolean, onClick: () -> Unit) 
                     InboxTab.SPAM     -> Icons.Outlined.Shield
                 },
                 contentDescription = null,
-                modifier = Modifier.size(iconSize)
+                modifier = Modifier
+                    .size(iconSize)
+                    .graphicsLayer { rotationZ = iconRotation }
             )
             Text(
                 text  = stringResource(tab.titleResId),

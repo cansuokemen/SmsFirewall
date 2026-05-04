@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Notifications
@@ -34,8 +36,17 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseInOut
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -44,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -55,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
+import com.example.smsfirewall.ui.animation.SwipePusherCharacter
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -134,18 +147,26 @@ internal fun ConversationListItem(
         backgroundContent = {
             val direction = dismissState.dismissDirection
             if (direction == SwipeToDismissBoxValue.EndToStart) {
+                val swipeProgress = try {
+                    dismissState.progress.coerceIn(0f, 1f)
+                } catch (_: Throwable) { 0f }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(RoundedCornerShape(20.dp))
                         .background(MaterialTheme.colorScheme.errorContainer)
-                        .padding(end = 20.dp),
-                    contentAlignment = Alignment.CenterEnd
+                        .padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.CenterStart
                 ) {
+                    SwipePusherCharacter(
+                        progress = swipeProgress,
+                        modifier = Modifier
+                    )
                     Icon(
                         imageVector = Icons.Outlined.Delete,
                         contentDescription = stringResource(R.string.cd_delete),
-                        tint = MaterialTheme.colorScheme.onErrorContainer
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.align(Alignment.CenterEnd)
                     )
                 }
             }
@@ -181,11 +202,22 @@ internal fun ConversationListItem(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     if (state.isSelectionMode) {
+                        val checkboxScale = remember { Animatable(0f) }
+                        LaunchedEffect(Unit) {
+                            checkboxScale.animateTo(
+                                targetValue   = 1f,
+                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+                            )
+                        }
                         Checkbox(
                             checked = state.isSelected,
                             onCheckedChange = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 callbacks.onToggleSelection()
+                            },
+                            modifier = Modifier.graphicsLayer {
+                                scaleX = checkboxScale.value
+                                scaleY = checkboxScale.value
                             },
                             colors = CheckboxDefaults.colors(
                                 checkedColor = MaterialTheme.colorScheme.primary
@@ -215,14 +247,44 @@ internal fun ConversationListItem(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text       = displayName,
-                                    style      = MaterialTheme.typography.titleSmall,
-                                    fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.SemiBold,
-                                    color      = MaterialTheme.colorScheme.onSurface,
-                                    maxLines   = 1,
-                                    overflow   = TextOverflow.Ellipsis
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (conversation.isPinned) {
+                                        Icon(
+                                            imageVector = Icons.Filled.PushPin,
+                                            contentDescription = stringResource(R.string.cd_pinned),
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                    }
+                                    if (conversation.isFavorite) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Star,
+                                            contentDescription = stringResource(R.string.cd_favorited),
+                                            tint = MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                    }
+                                    Text(
+                                        text       = displayName,
+                                        style      = MaterialTheme.typography.titleSmall,
+                                        fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.SemiBold,
+                                        color      = MaterialTheme.colorScheme.onSurface,
+                                        maxLines   = 1,
+                                        overflow   = TextOverflow.Ellipsis,
+                                        modifier   = Modifier.weight(1f, fill = false)
+                                    )
+                                    if (state.isNotificationsMuted) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(
+                                            imageVector = Icons.Outlined.NotificationsOff,
+                                            contentDescription = stringResource(R.string.cd_mute_notifications),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                    }
+                                }
                                 val latestMessage = conversation.messages.lastOrNull()
                                 if (latestMessage != null) {
                                     Text(
@@ -261,10 +323,24 @@ internal fun ConversationListItem(
                                     fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.Normal
                                 )
                                 if (hasUnread) {
+                                    val pulseTransition = rememberInfiniteTransition(label = "unreadPulse")
+                                    val pulseScale by pulseTransition.animateFloat(
+                                        initialValue   = 1f,
+                                        targetValue    = 1.08f,
+                                        animationSpec  = infiniteRepeatable(
+                                            animation  = tween(900, easing = EaseInOut),
+                                            repeatMode = RepeatMode.Reverse
+                                        ),
+                                        label = "unreadPulseScale"
+                                    )
                                     // Pill-shaped unread badge
                                     Box(
                                         modifier = Modifier
                                             .wrapContentSize()
+                                            .graphicsLayer {
+                                                scaleX = pulseScale
+                                                scaleY = pulseScale
+                                            }
                                             .clip(RoundedCornerShape(10.dp))
                                             .background(MaterialTheme.colorScheme.primary)
                                             .padding(horizontal = 7.dp, vertical = 3.dp),
@@ -300,26 +376,30 @@ internal fun ConversationListItem(
                         SwipeActionButton(
                             icon = Icons.Outlined.Notifications,
                             contentDescription = stringResource(R.string.cd_unmute_notifications),
-                            onClick = { callbacks.onHideActions(); callbacks.onUnmuteNotifications() }
+                            onClick = { callbacks.onHideActions(); callbacks.onUnmuteNotifications() },
+                            index = 0
                         )
                     } else {
                         SwipeActionButton(
                             icon = Icons.Outlined.NotificationsOff,
                             contentDescription = stringResource(R.string.cd_mute_notifications),
-                            onClick = { callbacks.onHideActions(); callbacks.onMuteNotifications() }
+                            onClick = { callbacks.onHideActions(); callbacks.onMuteNotifications() },
+                            index = 0
                         )
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                     SwipeActionButton(
                         icon = Icons.Outlined.Block,
                         contentDescription = stringResource(R.string.cd_block_sender),
-                        onClick = { callbacks.onHideActions(); callbacks.onBlockSender() }
+                        onClick = { callbacks.onHideActions(); callbacks.onBlockSender() },
+                        index = 1
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     SwipeActionButton(
                         icon = Icons.Outlined.Delete,
                         contentDescription = stringResource(R.string.cd_delete_conversation),
-                        onClick = { callbacks.onHideActions(); callbacks.onSwipeDeleteConversation() }
+                        onClick = { callbacks.onHideActions(); callbacks.onSwipeDeleteConversation() },
+                        index = 2
                     )
                 }
             }

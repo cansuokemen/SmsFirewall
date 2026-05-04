@@ -37,6 +37,8 @@ import androidx.compose.runtime.setValue
 import com.example.smsfirewall.R
 import com.example.smsfirewall.data.background.BackgroundSpec
 import com.example.smsfirewall.filter.SmsStatus
+import com.example.smsfirewall.ui.animation.PaperCrumpleOverlay
+import com.example.smsfirewall.ui.animation.ShredderBatchOverlay
 import com.example.smsfirewall.ui.background.BackgroundPickerSheet
 import com.example.smsfirewall.ui.theme.ThemeMode
 import com.example.smsfirewall.util.normalizeSender
@@ -78,8 +80,9 @@ fun BlockedSmsScreen(
     val currentUnreadIds   = if (viewModel.selectedTab == InboxTab.MESSAGES) unreadIds else emptySet()
     val unknownSenderLabel = stringResource(R.string.unknown_sender)
 
-    val visibleConversations = remember(visibleMessages, currentUnreadIds, unknownSenderLabel) {
-        buildConversations(visibleMessages, currentUnreadIds, unknownSenderLabel)
+    val visibleConversations = remember(visibleMessages, currentUnreadIds, unknownSenderLabel, viewModel.conversationMetaToken) {
+        buildConversations(visibleMessages, currentUnreadIds, unknownSenderLabel, viewModel.conversationMetaStore)
+            .filterNot { it.isArchived }
     }
     val pendingDeleteKeys = remember(viewModel.pendingDelete) {
         viewModel.pendingDelete?.conversations?.map { it.senderKey }?.toSet() ?: emptySet()
@@ -88,10 +91,18 @@ fun BlockedSmsScreen(
         if (pendingDeleteKeys.isEmpty()) visibleConversations
         else visibleConversations.filter { it.senderKey !in pendingDeleteKeys }
     }
-    val filteredConversations = remember(displayConversations, viewModel.conversationSearchQuery) {
+    val tabFilteredConversations = remember(displayConversations, viewModel.selectedTab, viewModel.messagesFilter) {
+        if (viewModel.selectedTab != InboxTab.MESSAGES) displayConversations
+        else when (viewModel.messagesFilter) {
+            MessagesFilter.ALL -> displayConversations
+            MessagesFilter.UNREAD -> displayConversations.filter { it.unreadCount > 0 }
+            MessagesFilter.FAVORITES -> displayConversations.filter { it.isFavorite }
+        }
+    }
+    val filteredConversations = remember(tabFilteredConversations, viewModel.conversationSearchQuery) {
         val query = viewModel.conversationSearchQuery.trim()
-        if (query.isBlank()) displayConversations
-        else displayConversations.filter { it.matchesSearchQuery(query) }
+        if (query.isBlank()) tabFilteredConversations
+        else tabFilteredConversations.filter { it.matchesSearchQuery(query) }
     }
     val openedConversation = remember(viewModel.openedConversationKey, visibleConversations) {
         viewModel.openedConversationKey?.let { key -> visibleConversations.firstOrNull { it.senderKey == key } }
@@ -174,25 +185,25 @@ fun BlockedSmsScreen(
                 targetState  = currentScreen,
                 transitionSpec = {
                     if (targetState == ScreenState.LIST) {
-                        // Back → slide from left, spring physics
+                        // Back → daha belirgin paralax kayma
                         (slideInHorizontally(
-                            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
-                            initialOffsetX = { -it / 4 }
-                        ) + fadeIn(tween(200))) togetherWith
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+                            initialOffsetX = { -it / 2 }
+                        ) + fadeIn(tween(250))) togetherWith
                         (slideOutHorizontally(
-                            animationSpec = tween(250),
+                            animationSpec = tween(300),
                             targetOffsetX = { it }
-                        ) + fadeOut(tween(200)))
+                        ) + fadeOut(tween(220)))
                     } else {
-                        // Forward → slide from right
+                        // Forward → daha belirgin slide
                         (slideInHorizontally(
-                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
                             initialOffsetX = { it }
-                        ) + fadeIn(tween(200))) togetherWith
+                        ) + fadeIn(tween(250))) togetherWith
                         (slideOutHorizontally(
-                            animationSpec = tween(250),
-                            targetOffsetX = { -it / 3 }
-                        ) + fadeOut(tween(200)))
+                            animationSpec = tween(300),
+                            targetOffsetX = { -it / 2 }
+                        ) + fadeOut(tween(220)))
                     }
                 },
                 label = "screen_transition"
@@ -303,7 +314,10 @@ fun BlockedSmsScreen(
                 Toast.makeText(context, context.getString(R.string.message_copied), Toast.LENGTH_SHORT).show()
                 viewModel.selectedForDelete = null
             },
-            onDelete      = { sms -> viewModel.deleteSingleMessage(sms) },
+            onDelete      = { sms ->
+                viewModel.beginCrumpleAnim(sms)
+                viewModel.deleteSingleMessage(sms)
+            },
             onBlockSender = { sms ->
                 viewModel.pendingBlockSenders = listOf(sms.sender)
                 viewModel.showBlockConfirm    = true
@@ -319,9 +333,23 @@ fun BlockedSmsScreen(
         BatchDeleteConfirmDialog(
             show      = viewModel.showBatchDeleteConfirm,
             count     = viewModel.selectedConversationKeys.size,
-            onConfirm = { viewModel.batchDeleteSelected(filteredConversations) },
+            onConfirm = {
+                val targets = filteredConversations.filter { it.senderKey in viewModel.selectedConversationKeys }
+                viewModel.beginShredderAnim(targets)
+                viewModel.batchDeleteSelected(filteredConversations)
+            },
             onDismiss = { viewModel.showBatchDeleteConfirm = false }
         )
+
+        viewModel.pendingCrumpleAnim?.let {
+            PaperCrumpleOverlay(onCompleted = { viewModel.finishCrumpleAnim() })
+        }
+        viewModel.pendingShredderAnim?.let { items ->
+            ShredderBatchOverlay(
+                itemCount   = items.size,
+                onCompleted = { viewModel.finishShredderAnim() }
+            )
+        }
 
         BlockSenderConfirmDialog(
             show        = viewModel.showBlockConfirm,

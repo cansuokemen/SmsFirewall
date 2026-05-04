@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.smsfirewall.data.ConversationMetaStore
 import com.example.smsfirewall.data.SpamRetentionPreferenceStore
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.background.BackgroundImageRepository
@@ -54,6 +55,7 @@ class InboxViewModel @Inject constructor(
     application: Application,
     val repository: SmsRepository,
     val mutedSenderStore: MutedSenderStore,
+    val conversationMetaStore: ConversationMetaStore,
     val filterKeywordStore: FilterKeywordStore,
     val spamRetentionStore: SpamRetentionPreferenceStore,
     val notificationPreferenceStore: NotificationPreferenceStore,
@@ -82,8 +84,22 @@ class InboxViewModel @Inject constructor(
     var selectedTab by mutableStateOf(InboxTab.MESSAGES)
         private set
 
+    var messagesFilter by mutableStateOf(MessagesFilter.ALL)
+        private set
+
+    var conversationMetaToken by mutableIntStateOf(0)
+        private set
+
     var conversationSearchInput by mutableStateOf("")
     var conversationSearchQuery by mutableStateOf("")
+
+    fun selectMessagesFilter(filter: MessagesFilter) {
+        messagesFilter = filter
+    }
+
+    private fun bumpMeta() {
+        conversationMetaToken++
+    }
 
     // --- Navigasyon ---
     var openedConversationKey by mutableStateOf<String?>(null)
@@ -117,6 +133,20 @@ class InboxViewModel @Inject constructor(
     // --- Diyalog ---
     var selectedForDelete by mutableStateOf<SmsEntity?>(null)
     var openedSpamMessage by mutableStateOf<SmsEntity?>(null)
+
+    // --- Silme animasyonu state ---
+    var pendingCrumpleAnim by mutableStateOf<SmsEntity?>(null)
+        private set
+    var pendingShredderAnim by mutableStateOf<List<SmsConversation>?>(null)
+        private set
+
+    fun beginCrumpleAnim(sms: SmsEntity) { pendingCrumpleAnim = sms }
+    fun finishCrumpleAnim() { pendingCrumpleAnim = null }
+
+    fun beginShredderAnim(conversations: List<SmsConversation>) {
+        if (conversations.isNotEmpty()) pendingShredderAnim = conversations
+    }
+    fun finishShredderAnim() { pendingShredderAnim = null }
 
     // --- Swipe aksiyonları ---
     var actionRevealedConversationKey by mutableStateOf<String?>(null)
@@ -411,6 +441,44 @@ class InboxViewModel @Inject constructor(
         if (toDelete.isNotEmpty()) {
             schedulePendingDelete(PendingDelete(toDelete, selectedTab))
         }
+    }
+
+    fun togglePinSelected(visibleConversations: List<SmsConversation>) {
+        val targets = visibleConversations.filter { it.senderKey in selectedConversationKeys }
+        if (targets.isEmpty()) return
+        val anyUnpinned = targets.any { !it.isPinned }
+        targets.forEach { conversationMetaStore.setPinned(it.displaySender, anyUnpinned) }
+        bumpMeta()
+        exitSelectionMode()
+    }
+
+    fun toggleFavoriteSelected(visibleConversations: List<SmsConversation>) {
+        val targets = visibleConversations.filter { it.senderKey in selectedConversationKeys }
+        if (targets.isEmpty()) return
+        val anyUnfav = targets.any { !it.isFavorite }
+        targets.forEach { conversationMetaStore.setFavorite(it.displaySender, anyUnfav) }
+        bumpMeta()
+        exitSelectionMode()
+    }
+
+    fun toggleMuteSelected(visibleConversations: List<SmsConversation>) {
+        val targets = visibleConversations.filter { it.senderKey in selectedConversationKeys }
+        if (targets.isEmpty()) return
+        val anyUnmuted = targets.any { !mutedSenderStore.isMuted(it.displaySender) }
+        targets.forEach {
+            if (anyUnmuted) mutedSenderStore.mute(it.displaySender)
+            else mutedSenderStore.unmute(it.displaySender)
+        }
+        mutedSendersChangeToken++
+        exitSelectionMode()
+    }
+
+    fun archiveSelected(visibleConversations: List<SmsConversation>) {
+        val targets = visibleConversations.filter { it.senderKey in selectedConversationKeys }
+        if (targets.isEmpty()) return
+        targets.forEach { conversationMetaStore.setArchived(it.displaySender, true) }
+        bumpMeta()
+        exitSelectionMode()
     }
 
     // --- Konuşma aksiyonları ---
