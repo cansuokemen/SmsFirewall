@@ -6,6 +6,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -106,14 +107,19 @@ internal fun DetailMessageBubble(
                     translationY      = translateYAnim.value * density.density
                     transformOrigin   = if (isOutgoing) RightOrigin else LeftOrigin
                 }
-                .then(
-                    if (isOutgoing) Modifier.shadow(3.dp, bubbleShape, clip = false)
-                    else Modifier
-                )
+                .shadow(if (isOutgoing) 4.dp else 2.dp, bubbleShape, clip = false)
                 .clip(bubbleShape)
                 .background(
                     if (isOutgoing) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                    else MaterialTheme.colorScheme.surfaceContainerHigh
+                )
+                .then(
+                    if (isOutgoing) Modifier
+                    else Modifier.border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
+                        shape = bubbleShape
+                    )
                 )
                 .combinedClickable(
                     onClick    = onClick,
@@ -128,13 +134,13 @@ internal fun DetailMessageBubble(
                 text  = sms.body.ifBlank { stringResource(R.string.empty_message_placeholder) },
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (isOutgoing) MaterialTheme.colorScheme.onPrimary
-                        else MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text     = formatMessageTimestamp(sms.receivedAt),
                 style    = MaterialTheme.typography.labelSmall,
-                color    = if (isOutgoing) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.65f)
-                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                color    = if (isOutgoing) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                           else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .align(Alignment.End)
                     .padding(top = 3.dp)
@@ -155,8 +161,10 @@ internal fun MessageBubble(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .shadow(2.dp, IncomingBubbleShape, clip = false)
             .clip(IncomingBubbleShape)
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f), IncomingBubbleShape)
             .combinedClickable(onClick = onClick, onLongClick = onLongPress)
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {

@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -61,6 +62,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -150,23 +152,30 @@ internal fun ConversationListItem(
                 val swipeProgress = try {
                     dismissState.progress.coerceIn(0f, 1f)
                 } catch (_: Throwable) { 0f }
-                Box(
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(RoundedCornerShape(20.dp))
                         .background(MaterialTheme.colorScheme.errorContainer)
-                        .padding(horizontal = 16.dp),
-                    contentAlignment = Alignment.CenterStart
                 ) {
+                    val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
+                    val charSizePx = with(LocalDensity.current) { 64.dp.toPx() }
+                    val cardEdgeFromLeft = (1f - swipeProgress) * widthPx
+                    val charXPx = (cardEdgeFromLeft - charSizePx).coerceAtLeast(8f)
+
                     SwipePusherCharacter(
                         progress = swipeProgress,
                         modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .graphicsLayer { translationX = charXPx }
                     )
                     Icon(
                         imageVector = Icons.Outlined.Delete,
                         contentDescription = stringResource(R.string.cd_delete),
                         tint = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.align(Alignment.CenterEnd)
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 18.dp)
                     )
                 }
             }

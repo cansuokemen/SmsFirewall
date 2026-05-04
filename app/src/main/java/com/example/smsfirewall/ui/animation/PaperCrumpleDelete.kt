@@ -1,6 +1,9 @@
 package com.example.smsfirewall.ui.animation
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseInOut
+import androidx.compose.animation.core.EaseOut
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -46,30 +49,30 @@ fun PaperCrumpleOverlay(
     val trashScale = remember { Animatable(1f) }
 
     LaunchedEffect(Unit) {
-        // Faz 1: buruşma (~180ms)
-        launch { scale.animateTo(0.42f, animationSpec = tween(180)) }
-        launch { cornerPx.animateTo(120f, animationSpec = tween(180)) }
-        launch { rotation.animateTo(35f, animationSpec = tween(180, easing = LinearEasing)) }
-        delay(180)
+        // Faz 1: yumuşak buruşma (~420ms)
+        launch { scale.animateTo(0.50f, animationSpec = tween(420, easing = FastOutSlowInEasing)) }
+        launch { cornerPx.animateTo(110f, animationSpec = tween(420, easing = EaseInOut)) }
+        launch { rotation.animateTo(28f, animationSpec = tween(420, easing = EaseInOut)) }
+        delay(360)
 
-        // Faz 2: parabolik düşüş çöp kutusuna (~280ms)
-        launch { translateX.animateTo(360f, animationSpec = tween(300, easing = LinearEasing)) }
-        launch { translateY.animateTo(560f, animationSpec = tween(300)) }
-        launch { rotation.animateTo(720f, animationSpec = tween(300, easing = LinearEasing)) }
-        launch { scale.animateTo(0.18f, animationSpec = tween(300)) }
-        delay(300)
+        // Faz 2: parabolik akıcı düşüş (~620ms)
+        launch { translateX.animateTo(360f, animationSpec = tween(620, easing = EaseInOut)) }
+        launch { translateY.animateTo(580f, animationSpec = tween(620, easing = EaseOut)) }
+        launch { rotation.animateTo(680f, animationSpec = tween(620, easing = LinearEasing)) }
+        launch { scale.animateTo(0.20f, animationSpec = tween(620, easing = EaseInOut)) }
+        delay(580)
 
-        // Faz 3: çöp ağzında kaybolma (~140ms)
-        launch { scale.animateTo(0f, animationSpec = tween(140)) }
-        launch { alpha.animateTo(0f, animationSpec = tween(140)) }
+        // Faz 3: çöp ağzında yumuşak kaybolma (~280ms)
+        launch { scale.animateTo(0f, animationSpec = tween(280, easing = EaseInOut)) }
+        launch { alpha.animateTo(0f, animationSpec = tween(280, easing = EaseInOut)) }
 
-        // Çöp shake
+        // Çöp pop animasyonu — daha geniş ve yumuşak
         launch {
-            trashScale.animateTo(1.18f, animationSpec = tween(120))
-            trashScale.animateTo(0.94f, animationSpec = tween(110))
-            trashScale.animateTo(1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+            trashScale.animateTo(1.20f, animationSpec = tween(180, easing = EaseOut))
+            trashScale.animateTo(0.92f, animationSpec = tween(180, easing = EaseInOut))
+            trashScale.animateTo(1f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow))
         }
-        delay(280)
+        delay(520)
         onCompleted()
     }
 

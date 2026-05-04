@@ -491,6 +491,8 @@ class InboxViewModel @Inject constructor(
     fun undoDelete() {
         pendingDeleteJob?.cancel()
         pendingDelete = null
+        pendingCrumpleAnim = null
+        pendingShredderAnim = null
     }
 
     fun commitPendingDelete() {
