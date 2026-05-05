@@ -6,7 +6,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -56,20 +55,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
-import com.example.smsfirewall.ui.animation.SwipePusherCharacter
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -119,7 +117,7 @@ internal fun ConversationListItem(
     val cardBgColor by animateColorAsState(
         targetValue = when {
             state.isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
-            else             -> MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)
+            else             -> MaterialTheme.colorScheme.surface.copy(alpha = 0.84f)
         },
         animationSpec = tween(durationMillis = 200),
         label = "cardBg"
@@ -149,33 +147,18 @@ internal fun ConversationListItem(
         backgroundContent = {
             val direction = dismissState.dismissDirection
             if (direction == SwipeToDismissBoxValue.EndToStart) {
-                val swipeProgress = try {
-                    dismissState.progress.coerceIn(0f, 1f)
-                } catch (_: Throwable) { 0f }
-                BoxWithConstraints(
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .background(MaterialTheme.colorScheme.errorContainer),
+                    contentAlignment = Alignment.CenterEnd
                 ) {
-                    val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
-                    val charSizePx = with(LocalDensity.current) { 64.dp.toPx() }
-                    val cardEdgeFromLeft = (1f - swipeProgress) * widthPx
-                    val charXPx = (cardEdgeFromLeft - charSizePx).coerceAtLeast(8f)
-
-                    SwipePusherCharacter(
-                        progress = swipeProgress,
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .graphicsLayer { translationX = charXPx }
-                    )
                     Icon(
                         imageVector = Icons.Outlined.Delete,
                         contentDescription = stringResource(R.string.cd_delete),
                         tint = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(end = 18.dp)
+                        modifier = Modifier.padding(end = 24.dp)
                     )
                 }
             }
@@ -187,9 +170,9 @@ internal fun ConversationListItem(
                     .fillMaxWidth()
                     .then(
                         if (hasUnread && !state.isSelected)
-                            Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+                            Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
                         else
-                            Modifier.border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f), RoundedCornerShape(20.dp))
+                            Modifier
                     )
                     .combinedClickable(
                         onClick = {
@@ -375,9 +358,11 @@ internal fun ConversationListItem(
                 Row(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
+                        .padding(end = 6.dp)
                         .alpha(actionsAlpha)
-                        .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.97f))
+                        .shadow(4.dp, RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.98f))
                         .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

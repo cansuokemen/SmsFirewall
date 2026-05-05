@@ -80,9 +80,14 @@ fun BlockedSmsScreen(
     val currentUnreadIds   = if (viewModel.selectedTab == InboxTab.MESSAGES) unreadIds else emptySet()
     val unknownSenderLabel = stringResource(R.string.unknown_sender)
 
-    val visibleConversations = remember(visibleMessages, currentUnreadIds, unknownSenderLabel, viewModel.conversationMetaToken) {
+    val allConversations = remember(visibleMessages, currentUnreadIds, unknownSenderLabel, viewModel.conversationMetaToken) {
         buildConversations(visibleMessages, currentUnreadIds, unknownSenderLabel, viewModel.conversationMetaStore)
-            .filterNot { it.isArchived }
+    }
+    val archivedConversations = remember(allConversations) {
+        allConversations.filter { it.isArchived }
+    }
+    val visibleConversations = remember(allConversations) {
+        allConversations.filterNot { it.isArchived }
     }
     val pendingDeleteKeys = remember(viewModel.pendingDelete) {
         viewModel.pendingDelete?.conversations?.map { it.senderKey }?.toSet() ?: emptySet()
@@ -146,10 +151,11 @@ fun BlockedSmsScreen(
     }
 
     val currentScreen = when {
-        viewModel.isSettingsOpen     -> ScreenState.SETTINGS
-        openedConversation != null   -> ScreenState.DETAIL
+        viewModel.isSettingsOpen         -> ScreenState.SETTINGS
+        viewModel.isArchiveOpen          -> ScreenState.ARCHIVE
+        openedConversation != null       -> ScreenState.DETAIL
         viewModel.isNewMessageScreenOpen -> ScreenState.NEW_MESSAGE
-        else                         -> ScreenState.LIST
+        else                             -> ScreenState.LIST
     }
 
     val snackbarHostState  = remember { SnackbarHostState() }
@@ -291,13 +297,36 @@ fun BlockedSmsScreen(
                         )
                     }
 
+                    ScreenState.ARCHIVE -> {
+                        ArchiveListContent(
+                            viewModel            = viewModel,
+                            archivedConversations = archivedConversations,
+                            unreadIds            = currentUnreadIds,
+                            modifier             = Modifier.fillMaxSize()
+                        )
+                    }
+
                     ScreenState.LIST -> {
+                        val msgUnreadCount = remember(displayConversations, viewModel.selectedTab) {
+                            if (viewModel.selectedTab == InboxTab.MESSAGES)
+                                displayConversations.count { it.unreadCount > 0 }
+                            else 0
+                        }
+                        val msgFavoriteCount = remember(displayConversations, viewModel.selectedTab, viewModel.conversationMetaToken) {
+                            if (viewModel.selectedTab == InboxTab.MESSAGES)
+                                displayConversations.count { it.isFavorite }
+                            else 0
+                        }
                         ConversationListContent(
                             viewModel             = viewModel,
                             filteredConversations = filteredConversations,
                             unreadIds             = currentUnreadIds,
                             conversationListState = conversationListState,
-                            isBottomBarVisible    = isBottomBarVisible
+                            isBottomBarVisible    = isBottomBarVisible,
+                            messagesUnreadCount   = msgUnreadCount,
+                            messagesFavoriteCount = msgFavoriteCount,
+                            archivedCount         = archivedConversations.size,
+                            onOpenArchive         = { viewModel.openArchive() }
                         )
                     }
                 }

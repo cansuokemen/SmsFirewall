@@ -43,7 +43,7 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 enum class ScreenState {
-    LIST, DETAIL, NEW_MESSAGE, SETTINGS
+    LIST, DETAIL, NEW_MESSAGE, SETTINGS, ARCHIVE
 }
 
 sealed interface UiEvent {
@@ -111,9 +111,13 @@ class InboxViewModel @Inject constructor(
     var isSettingsOpen by mutableStateOf(false)
         private set
 
+    var isArchiveOpen by mutableStateOf(false)
+        private set
+
     val currentScreen: ScreenState
         get() = when {
             isSettingsOpen -> ScreenState.SETTINGS
+            isArchiveOpen -> ScreenState.ARCHIVE
             openedConversationKey != null -> ScreenState.DETAIL
             isNewMessageScreenOpen -> ScreenState.NEW_MESSAGE
             else -> ScreenState.LIST
@@ -479,6 +483,24 @@ class InboxViewModel @Inject constructor(
         targets.forEach { conversationMetaStore.setArchived(it.displaySender, true) }
         bumpMeta()
         exitSelectionMode()
+    }
+
+    fun unarchiveSelected(visibleConversations: List<SmsConversation>) {
+        val targets = visibleConversations.filter { it.senderKey in selectedConversationKeys }
+        if (targets.isEmpty()) return
+        targets.forEach { conversationMetaStore.setArchived(it.displaySender, false) }
+        bumpMeta()
+        exitSelectionMode()
+    }
+
+    fun openArchive() {
+        exitSelectionMode()
+        isArchiveOpen = true
+    }
+
+    fun closeArchive() {
+        exitSelectionMode()
+        isArchiveOpen = false
     }
 
     // --- Konuşma aksiyonları ---

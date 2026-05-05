@@ -21,9 +21,14 @@
     <string name="action_favorite">Favoriye Ekle</string>
     <string name="action_mute">Sessize Al</string>
     <string name="action_archive">Arşivle</string>
+    <string name="action_unarchive">Arşivden Çıkar</string>
+    <string name="archived_conversations">Arşivlenenler</string>
+    <string name="archive_empty_title">Arşiv boş</string>
+    <string name="archive_empty_subtitle">Arşivlediğiniz sohbetler burada görünecek</string>
     <string name="cd_pin">Sabitle</string>
     <string name="cd_favorite">Favoriye ekle</string>
     <string name="cd_archive">Arşivle</string>
+    <string name="cd_unarchive">Arşivden çıkar</string>
     <string name="cd_pinned">Sabitlenmiş</string>
     <string name="cd_favorited">Favori</string>
 

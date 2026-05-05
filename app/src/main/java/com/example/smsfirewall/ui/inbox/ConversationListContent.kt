@@ -24,11 +24,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -40,8 +43,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Deselect
 import androidx.compose.material.icons.outlined.MailOutline
@@ -53,6 +59,8 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -62,8 +70,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.animation.core.Animatable
@@ -101,6 +107,10 @@ internal fun ConversationListContent(
     unreadIds: Set<Long>,
     conversationListState: LazyListState,
     isBottomBarVisible: Boolean,
+    messagesUnreadCount: Int = 0,
+    messagesFavoriteCount: Int = 0,
+    archivedCount: Int = 0,
+    onOpenArchive: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -171,43 +181,20 @@ internal fun ConversationListContent(
                 enter   = slideInVertically(initialOffsetY = { -it }) + fadeIn(tween(200)),
                 exit    = slideOutVertically(targetOffsetY = { -it }) + fadeOut(tween(200))
             ) {
-                val totalCount = remember(filteredConversations) { filteredConversations.size }
-                val unreadStat = remember(filteredConversations) { filteredConversations.count { it.unreadCount > 0 } }
-                val favStat    = remember(filteredConversations) { filteredConversations.count { it.isFavorite } }
-                val spamStat   = remember(filteredConversations) { filteredConversations.count { it.messages.any { m -> m.reason.contains("spam", ignoreCase = true) || m.reason.contains("block", ignoreCase = true) } } }
-                NormalHeader(
-                    onOpenSettings = { viewModel.openSettings() },
-                    totalConversations = totalCount,
-                    unreadCount = unreadStat,
-                    spamCount = spamStat,
-                    favoriteCount = favStat
-                )
+                NormalHeader(onOpenSettings = { viewModel.openSettings() })
             }
 
             if (viewModel.shouldShowNotificationWarning) {
                 NotificationWarningCard(onOpenSettings = openNotificationSettings)
             }
 
-            // Tab row with icons — surface background for contrast over Aurora
-            PrimaryTabRow(
-                selectedTabIndex = viewModel.selectedTab.ordinal,
-                modifier = Modifier
+            InboxSegmentedControl(
+                selectedTab = viewModel.selectedTab,
+                onSelect    = { viewModel.selectTab(it) },
+                modifier    = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-                    .shadow(2.dp, RoundedCornerShape(16.dp))
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)),
-                containerColor = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.primary
-            ) {
-                InboxTab.entries.forEach { tab ->
-                    InboxTabItem(
-                        tab      = tab,
-                        selected = viewModel.selectedTab == tab,
-                        onClick  = { viewModel.selectTab(tab) }
-                    )
-                }
-            }
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            )
 
             AnimatedVisibility(
                 visible = viewModel.selectedTab == InboxTab.MESSAGES && !viewModel.isSelectionMode,
@@ -215,8 +202,10 @@ internal fun ConversationListContent(
                 exit    = fadeOut(tween(160)) + slideOutVertically(targetOffsetY = { -it / 2 })
             ) {
                 MessagesFilterChipRow(
-                    current  = viewModel.messagesFilter,
-                    onChange = { viewModel.selectMessagesFilter(it) }
+                    current        = viewModel.messagesFilter,
+                    onChange       = { viewModel.selectMessagesFilter(it) },
+                    unreadCount    = messagesUnreadCount,
+                    favoriteCount  = messagesFavoriteCount
                 )
             }
 
@@ -327,6 +316,17 @@ internal fun ConversationListContent(
                                 state         = itemState,
                                 callbacks     = itemCallbacks
                             )
+                        }
+                        if (archivedCount > 0 && !viewModel.isSelectionMode &&
+                            viewModel.selectedTab == InboxTab.MESSAGES) {
+                            item(key = "archive_entry") {
+                                Spacer(modifier = Modifier.height(4.dp).animateItem())
+                                ArchiveEntryRow(
+                                    count = archivedCount,
+                                    onClick = onOpenArchive,
+                                    modifier = Modifier.animateItem()
+                                )
+                            }
                         }
                     }
                 }
@@ -459,29 +459,78 @@ private fun SelectionModeHeader(
 @Composable
 private fun MessagesFilterChipRow(
     current: MessagesFilter,
-    onChange: (MessagesFilter) -> Unit
+    onChange: (MessagesFilter) -> Unit,
+    unreadCount: Int = 0,
+    favoriteCount: Int = 0
 ) {
     val haptic = LocalHapticFeedback.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         MessagesFilter.entries.forEach { filter ->
             val selected = current == filter
+            val badge = when (filter) {
+                MessagesFilter.UNREAD    -> unreadCount
+                MessagesFilter.FAVORITES -> favoriteCount
+                MessagesFilter.ALL       -> 0
+            }
             FilterChip(
                 selected = selected,
-                onClick = {
+                onClick  = {
                     if (current != filter) {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onChange(filter)
                     }
                 },
-                label = { Text(text = stringResource(filter.titleResId)) },
+                label = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text       = stringResource(filter.titleResId),
+                            style      = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                        if (badge > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.18f)
+                                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                    )
+                                    .padding(horizontal = 5.dp, vertical = 1.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text       = if (badge > 99) "99+" else badge.toString(),
+                                    style      = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color      = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                                                 else MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                },
+                leadingIcon = null,
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor     = MaterialTheme.colorScheme.onPrimaryContainer
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f),
+                    selectedLabelColor     = MaterialTheme.colorScheme.onPrimaryContainer,
+                    containerColor         = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.65f),
+                    labelColor             = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled             = true,
+                    selected            = selected,
+                    borderColor         = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                    selectedBorderColor = Color.Transparent,
+                    borderWidth         = 0.5.dp,
+                    selectedBorderWidth = 0.dp
                 )
             )
         }
@@ -489,95 +538,39 @@ private fun MessagesFilterChipRow(
 }
 
 @Composable
-private fun NormalHeader(
-    onOpenSettings: () -> Unit,
-    totalConversations: Int,
-    unreadCount: Int,
-    spamCount: Int,
-    favoriteCount: Int
-) {
+private fun NormalHeader(onOpenSettings: () -> Unit) {
     val haptic = LocalHapticFeedback.current
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, top = 16.dp, end = 12.dp, bottom = 8.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text       = stringResource(R.string.app_name),
-                style      = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Black,
-                color      = MaterialTheme.colorScheme.onSurface,
-                modifier   = Modifier
-                    .weight(1f)
-                    .graphicsLayer { shadowElevation = 6f }
-            )
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .shadow(4.dp, CircleShape)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onOpenSettings()
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector        = Icons.Outlined.Settings,
-                    contentDescription = stringResource(R.string.cd_settings),
-                    tint               = MaterialTheme.colorScheme.onSurface,
-                    modifier           = Modifier.size(22.dp)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.padding(top = 12.dp))
-        InboxStatsRow(
-            total      = totalConversations,
-            unread     = unreadCount,
-            favorites  = favoriteCount,
-            spam       = spamCount
-        )
-    }
-}
-
-@Composable
-private fun InboxStatsRow(total: Int, unread: Int, favorites: Int, spam: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(end = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        StatChip(label = stringResource(R.string.stats_total),     value = total,     modifier = Modifier.weight(1f))
-        StatChip(label = stringResource(R.string.stats_unread),    value = unread,    modifier = Modifier.weight(1f))
-        StatChip(label = stringResource(R.string.stats_favorites), value = favorites, modifier = Modifier.weight(1f))
-        StatChip(label = stringResource(R.string.stats_spam),      value = spam,      modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun StatChip(label: String, value: Int, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .shadow(3.dp, RoundedCornerShape(14.dp))
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f))
-            .padding(vertical = 8.dp, horizontal = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(start = 20.dp, top = 20.dp, end = 16.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = value.toString(),
-            style = MaterialTheme.typography.titleMedium,
+            text       = stringResource(R.string.app_name),
+            style      = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.primary
+            color      = MaterialTheme.colorScheme.onSurface,
+            modifier   = Modifier.weight(1f)
         )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
-        )
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f))
+                .clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onOpenSettings()
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector        = Icons.Outlined.Settings,
+                contentDescription = stringResource(R.string.cd_settings),
+                tint               = MaterialTheme.colorScheme.onSurface,
+                modifier           = Modifier.size(20.dp)
+            )
+        }
     }
 }
 
@@ -685,44 +678,383 @@ private fun BottomSearchBar(
 }
 
 @Composable
-private fun InboxTabItem(tab: InboxTab, selected: Boolean, onClick: () -> Unit) {
-    val iconSize by animateDpAsState(
-        targetValue   = if (selected) 20.dp else 18.dp,
-        animationSpec = tween(200),
-        label         = "tabIconSize"
-    )
-    val iconRotation by animateFloatAsState(
-        targetValue   = if (selected) 360f else 0f,
-        animationSpec = tween(durationMillis = 450),
-        label         = "tabIconRotate"
-    )
-    Tab(
-        selected = selected,
-        onClick  = onClick,
-        selectedContentColor   = MaterialTheme.colorScheme.primary,
-        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+private fun InboxSegmentedControl(
+    selectedTab: InboxTab,
+    onSelect: (InboxTab) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    val tabs = InboxTab.entries
+
+    Box(
+        modifier = modifier
+            .height(46.dp)
+            .shadow(2.dp, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f))
+    ) {
+        val selectedIndex = tabs.indexOf(selectedTab)
+        val pillOffsetFraction by animateFloatAsState(
+            targetValue   = selectedIndex.toFloat() / tabs.size.toFloat(),
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness    = Spring.StiffnessMediumLow
+            ),
+            label = "segPill"
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(1f / tabs.size)
+                .graphicsLayer { translationX = pillOffsetFraction * size.width * tabs.size }
+                .padding(4.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer)
+        )
+        Row(modifier = Modifier.fillMaxSize()) {
+            tabs.forEach { tab ->
+                val isSelected = tab == selectedTab
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(
+                            indication        = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSelect(tab)
+                        },
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = when (tab) {
+                            InboxTab.MESSAGES -> Icons.Outlined.MailOutline
+                            InboxTab.SPAM     -> Icons.Outlined.Shield
+                        },
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                               else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text       = stringResource(tab.titleResId),
+                        style      = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                        color      = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                     else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ArchiveEntryRow(
+    count: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape  = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.80f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
-            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(
-                imageVector = when (tab) {
-                    InboxTab.MESSAGES -> Icons.Outlined.MailOutline
-                    InboxTab.SPAM     -> Icons.Outlined.Shield
-                },
-                contentDescription = null,
+            Box(
                 modifier = Modifier
-                    .size(iconSize)
-                    .graphicsLayer { rotationZ = iconRotation }
-            )
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector        = Icons.Outlined.Archive,
+                    contentDescription = null,
+                    tint               = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier           = Modifier.size(22.dp)
+                )
+            }
             Text(
-                text  = stringResource(tab.titleResId),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                text       = stringResource(R.string.archived_conversations),
+                style      = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color      = MaterialTheme.colorScheme.onSurface,
+                modifier   = Modifier.weight(1f)
+            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text       = count.toString(),
+                    style      = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color      = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+            Icon(
+                imageVector        = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = null,
+                tint               = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier           = Modifier.size(20.dp)
             )
         }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@Composable
+internal fun ArchiveListContent(
+    viewModel: InboxViewModel,
+    archivedConversations: List<SmsConversation>,
+    unreadIds: Set<Long>,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val haptic  = LocalHapticFeedback.current
+
+    AppBackground(spec = viewModel.mainBackground, modifier = modifier) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            AnimatedVisibility(
+                visible = viewModel.isSelectionMode,
+                enter   = slideInVertically(initialOffsetY = { -it }) + fadeIn(tween(200)),
+                exit    = slideOutVertically(targetOffsetY = { -it }) + fadeOut(tween(200))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, top = 8.dp, end = 0.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { viewModel.exitSelectionMode() }) {
+                            Icon(
+                                imageVector        = Icons.Filled.Close,
+                                contentDescription = stringResource(R.string.cd_close_selection)
+                            )
+                        }
+                        Text(
+                            text       = stringResource(R.string.selected_count, viewModel.selectedConversationKeys.size),
+                            style      = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier   = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = {
+                            val allSelected = archivedConversations.isNotEmpty() &&
+                                viewModel.selectedConversationKeys.size == archivedConversations.size
+                            if (allSelected) viewModel.deselectAll()
+                            else viewModel.selectAll(archivedConversations.map { it.senderKey }.toSet())
+                        }) {
+                            val allSelected = archivedConversations.isNotEmpty() &&
+                                viewModel.selectedConversationKeys.size == archivedConversations.size
+                            Icon(
+                                imageVector        = if (allSelected) Icons.Outlined.Deselect else Icons.Outlined.SelectAll,
+                                contentDescription = stringResource(if (allSelected) R.string.deselect_all else R.string.select_all)
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(start = 4.dp, end = 4.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        val hasSelection = viewModel.selectedConversationKeys.isNotEmpty()
+                        IconButton(
+                            onClick  = { viewModel.unarchiveSelected(archivedConversations) },
+                            enabled  = hasSelection
+                        ) {
+                            Icon(
+                                imageVector        = Icons.Outlined.Unarchive,
+                                contentDescription = stringResource(R.string.cd_unarchive),
+                                tint               = if (hasSelection) MaterialTheme.colorScheme.primary
+                                                     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                            )
+                        }
+                        IconButton(
+                            onClick  = { viewModel.showBatchDeleteConfirm = true },
+                            enabled  = hasSelection
+                        ) {
+                            Icon(
+                                imageVector        = Icons.Outlined.Delete,
+                                contentDescription = stringResource(R.string.delete_selected),
+                                tint               = if (hasSelection) MaterialTheme.colorScheme.error
+                                                     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                            )
+                        }
+                    }
+                }
+            }
+            AnimatedVisibility(
+                visible = !viewModel.isSelectionMode,
+                enter   = slideInVertically(initialOffsetY = { -it }) + fadeIn(tween(200)),
+                exit    = slideOutVertically(targetOffsetY = { -it }) + fadeOut(tween(200))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, top = 12.dp, end = 16.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { viewModel.closeArchive() }) {
+                        Icon(
+                            imageVector        = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = stringResource(R.string.back)
+                        )
+                    }
+                    Text(
+                        text       = stringResource(R.string.archived_conversations),
+                        style      = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier   = Modifier.weight(1f)
+                    )
+                    if (archivedConversations.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.secondaryContainer)
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text       = archivedConversations.size.toString(),
+                                style      = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color      = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (archivedConversations.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector        = Icons.Outlined.Archive,
+                            contentDescription = stringResource(R.string.cd_empty_state),
+                            tint               = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier           = Modifier.size(64.dp)
+                        )
+                        Text(
+                            text   = stringResource(R.string.archive_empty_title),
+                            style  = MaterialTheme.typography.titleMedium,
+                            color  = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text   = stringResource(R.string.archive_empty_subtitle),
+                            style  = MaterialTheme.typography.bodyMedium,
+                            color  = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            } else {
+                val firstAppearTimeMs = remember { System.currentTimeMillis() }
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp)
+                        .padding(top = 8.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    itemsIndexed(archivedConversations, key = { _, item -> item.senderKey }) { index, conversation ->
+                        val isSenderMuted = remember(conversation.senderKey, viewModel.mutedSendersChangeToken) {
+                            viewModel.mutedSenderStore.isMuted(conversation.displaySender)
+                        }
+                        val contactName = remember(conversation.displaySender) {
+                            viewModel.getContactName(conversation.displaySender)
+                        }
+                        val itemState = ConversationItemState(
+                            isSelectionMode      = viewModel.isSelectionMode,
+                            isSelected           = conversation.senderKey in viewModel.selectedConversationKeys,
+                            isActionsVisible     = false,
+                            isNotificationsMuted = isSenderMuted,
+                            showReason           = false
+                        )
+                        val itemCallbacks = ConversationItemCallbacks(
+                            onToggleSelection    = { viewModel.toggleSelection(conversation.senderKey) },
+                            onLongClick          = { viewModel.enterSelectionMode(conversation.senderKey) },
+                            onOpenConversation   = {
+                                if (viewModel.isSelectionMode) viewModel.toggleSelection(conversation.senderKey)
+                            },
+                            onShowActions        = {},
+                            onHideActions        = {},
+                            onSwipeDeleteConversation = { viewModel.deleteConversation(conversation) },
+                            onMuteNotifications  = {
+                                viewModel.muteNotifications(conversation.displaySender)
+                                Toast.makeText(context, context.getString(R.string.notifications_muted), Toast.LENGTH_SHORT).show()
+                            },
+                            onUnmuteNotifications = {
+                                viewModel.unmuteNotifications(conversation.displaySender)
+                                Toast.makeText(context, context.getString(R.string.notifications_unmuted), Toast.LENGTH_SHORT).show()
+                            },
+                            onBlockSender = {
+                                viewModel.pendingBlockSenders = listOf(conversation.displaySender)
+                                viewModel.showBlockConfirm = true
+                            }
+                        )
+                        val isInitialLoad = remember { System.currentTimeMillis() - firstAppearTimeMs < 800L }
+                        val staggerOffset = remember { Animatable(if (isInitialLoad) 60f else 0f) }
+                        val staggerAlpha  = remember { Animatable(if (isInitialLoad) 0f else 1f) }
+                        if (isInitialLoad) {
+                            LaunchedEffect(Unit) {
+                                kotlinx.coroutines.delay((index.coerceAtMost(8)) * 45L)
+                                launch { staggerOffset.animateTo(0f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) }
+                                launch { staggerAlpha.animateTo(1f, animationSpec = tween(280)) }
+                            }
+                        }
+                        ConversationListItem(
+                            modifier     = Modifier
+                                .animateItem()
+                                .graphicsLayer {
+                                    translationY = staggerOffset.value * this.density
+                                    alpha        = staggerAlpha.value
+                                },
+                            conversation = conversation,
+                            contactName  = contactName,
+                            state        = itemState,
+                            callbacks    = itemCallbacks
+                        )
+                    }
+                }
+            }
+        }
+
+        BatchDeleteConfirmDialog(
+            show      = viewModel.showBatchDeleteConfirm,
+            count     = viewModel.selectedConversationKeys.size,
+            onConfirm = {
+                val targets = archivedConversations.filter { it.senderKey in viewModel.selectedConversationKeys }
+                viewModel.beginShredderAnim(targets)
+                viewModel.batchDeleteSelected(archivedConversations)
+            },
+            onDismiss = { viewModel.showBatchDeleteConfirm = false }
+        )
     }
 }

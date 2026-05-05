@@ -69,7 +69,7 @@ import com.example.smsfirewall.data.background.BackgroundSpec
 import com.example.smsfirewall.ui.animation.MorphingCheckmark
 import kotlinx.coroutines.launch
 
-private enum class BackgroundCategory { Gradient, Pattern, Solid, Image }
+private enum class BackgroundCategory { Pattern, Image }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -121,15 +121,7 @@ fun BackgroundPickerSheet(
 
             Box(modifier = Modifier.fillMaxWidth().height(280.dp)) {
                 when (category) {
-                    BackgroundCategory.Gradient -> GradientGrid(
-                        selected = draft,
-                        onSelect = { draft = it }
-                    )
                     BackgroundCategory.Pattern -> PatternGrid(
-                        selected = draft,
-                        onSelect = { draft = it }
-                    )
-                    BackgroundCategory.Solid -> SolidGrid(
                         selected = draft,
                         onSelect = { draft = it }
                     )
@@ -180,11 +172,9 @@ fun BackgroundPickerSheet(
 }
 
 private fun initialCategoryFor(spec: BackgroundSpec): BackgroundCategory = when (spec) {
-    is BackgroundSpec.Gradient    -> BackgroundCategory.Gradient
     is BackgroundSpec.Pattern     -> BackgroundCategory.Pattern
-    is BackgroundSpec.SolidColor  -> BackgroundCategory.Solid
     is BackgroundSpec.CustomImage -> BackgroundCategory.Image
-    BackgroundSpec.Default        -> BackgroundCategory.Gradient
+    else                          -> BackgroundCategory.Pattern
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -212,10 +202,8 @@ private fun CategoryChips(
             Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                 entries.forEach { cat ->
                     val label = when (cat) {
-                        BackgroundCategory.Gradient -> R.string.background_cat_gradient
-                        BackgroundCategory.Pattern  -> R.string.background_cat_pattern
-                        BackgroundCategory.Solid    -> R.string.background_cat_solid
-                        BackgroundCategory.Image    -> R.string.background_cat_image
+                        BackgroundCategory.Pattern -> R.string.background_cat_pattern
+                        BackgroundCategory.Image   -> R.string.background_cat_image
                     }
                     Box(modifier = Modifier.size(width = chipWidth, height = 36.dp)) {
                         CategoryChip(stringResource(label), category == cat) { onSelect(cat) }
@@ -247,50 +235,6 @@ private fun CategoryChip(label: String, selected: Boolean, onClick: () -> Unit) 
             selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
         )
     )
-}
-
-@Composable
-private fun GradientGrid(
-    selected: BackgroundSpec,
-    onSelect: (BackgroundSpec) -> Unit
-) {
-    val selectedId = (selected as? BackgroundSpec.Gradient)?.presetId
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        itemsIndexed(BackgroundPresets.gradients, key = { _, item -> item.id }) { index, preset ->
-            val brush = remember(preset.id) { BackgroundPresets.gradientBrush(preset.id) }
-            val isSelected = preset.id == selectedId
-            StaggeredEntry(index = index) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(brush)
-                            .border(
-                                width = if (isSelected) 2.dp else 0.5.dp,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                shape = RoundedCornerShape(16.dp)
-                            )
-                            .clickable { onSelect(BackgroundSpec.Gradient(preset.id)) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        MorphingCheckmark(visible = isSelected, size = 28.dp)
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = preset.displayName,
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                }
-            }
-        }
-    }
 }
 
 @Composable
@@ -356,43 +300,6 @@ private fun PatternGrid(
                         text = preset.displayName,
                         style = MaterialTheme.typography.labelSmall
                     )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SolidGrid(
-    selected: BackgroundSpec,
-    onSelect: (BackgroundSpec) -> Unit
-) {
-    val selectedArgb = (selected as? BackgroundSpec.SolidColor)?.argb
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(4),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        itemsIndexed(BackgroundPresets.solidPalette) { index, color ->
-            val argb = color.toArgbLong()
-            val isSelected = argb == selectedArgb
-            StaggeredEntry(index = index) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(color)
-                        .border(
-                            width = if (isSelected) 2.dp else 0.5.dp,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(14.dp)
-                        )
-                        .clickable { onSelect(BackgroundSpec.SolidColor(argb)) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    MorphingCheckmark(visible = isSelected, size = 24.dp)
                 }
             }
         }
