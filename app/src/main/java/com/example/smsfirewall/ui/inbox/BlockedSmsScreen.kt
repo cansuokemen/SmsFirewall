@@ -20,6 +20,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -156,6 +157,16 @@ fun BlockedSmsScreen(
         openedConversation != null       -> ScreenState.DETAIL
         viewModel.isNewMessageScreenOpen -> ScreenState.NEW_MESSAGE
         else                             -> ScreenState.LIST
+    }
+
+    BackHandler(enabled = currentScreen != ScreenState.LIST) {
+        when (currentScreen) {
+            ScreenState.SETTINGS    -> viewModel.closeSettings()
+            ScreenState.DETAIL      -> viewModel.closeConversation()
+            ScreenState.NEW_MESSAGE -> viewModel.closeNewMessage()
+            ScreenState.ARCHIVE     -> viewModel.closeArchive()
+            ScreenState.LIST        -> { }
+        }
     }
 
     val snackbarHostState  = remember { SnackbarHostState() }

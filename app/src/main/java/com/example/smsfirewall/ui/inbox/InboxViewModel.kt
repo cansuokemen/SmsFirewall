@@ -310,6 +310,12 @@ class InboxViewModel @Inject constructor(
             contentObserver
         )
         refreshSystemMessages()
+        viewModelScope.launch {
+            repository.deleteByStatusBefore(
+                status = SmsStatus.BLOCK,
+                beforeTimestamp = spamRetentionStore.cutoffTimestamp()
+            )
+        }
     }
 
     override fun onCleared() {
@@ -351,14 +357,6 @@ class InboxViewModel @Inject constructor(
         selectedTab = tab
         isSelectionMode = false
         selectedConversationKeys = emptySet()
-        if (tab == InboxTab.SPAM) {
-            viewModelScope.launch {
-                repository.deleteByStatusBefore(
-                    status = SmsStatus.BLOCK,
-                    beforeTimestamp = spamRetentionStore.cutoffTimestamp()
-                )
-            }
-        }
     }
 
     fun openConversation(key: String) {
@@ -568,6 +566,34 @@ class InboxViewModel @Inject constructor(
         viewModelScope.launch {
             val moved = moveSpamToSystemInbox(context, repository, sms)
             onResult(moved)
+        }
+    }
+
+    fun markSelectedAsSpam(visibleConversations: List<SmsConversation>) {
+        val targets = visibleConversations.filter { it.senderKey in selectedConversationKeys }
+        if (targets.isEmpty()) return
+        exitSelectionMode()
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                for (conv in targets) {
+                    for (sms in conv.messages) {
+                        repository.insert(
+                            SmsEntity(
+                                id         = 0,
+                                sender     = sms.sender,
+                                body       = sms.body,
+                                receivedAt = sms.receivedAt,
+                                status     = SmsStatus.BLOCK,
+                                reason     = "Manually marked as spam"
+                            )
+                        )
+                        if (sms.reason != SENT_MESSAGE_REASON) {
+                            deleteSmsFromSystemProvider(context, sms.id)
+                        }
+                    }
+                }
+            }
+            selectTab(InboxTab.SPAM)
         }
     }
 

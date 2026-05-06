@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -51,8 +50,10 @@ import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Deselect
 import androidx.compose.material.icons.outlined.MailOutline
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
@@ -61,10 +62,13 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -77,7 +81,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -166,6 +172,9 @@ internal fun ConversationListContent(
                     onFavorite = { viewModel.toggleFavoriteSelected(filteredConversations) },
                     onMute = { viewModel.toggleMuteSelected(filteredConversations) },
                     onArchive = { viewModel.archiveSelected(filteredConversations) },
+                    onMarkAsSpam = if (viewModel.selectedTab == InboxTab.MESSAGES) {
+                        { viewModel.markSelectedAsSpam(filteredConversations) }
+                    } else null,
                     onBlock = {
                         viewModel.pendingBlockSenders = filteredConversations
                             .filter { it.senderKey in viewModel.selectedConversationKeys }
@@ -182,6 +191,23 @@ internal fun ConversationListContent(
                 exit    = slideOutVertically(targetOffsetY = { -it }) + fadeOut(tween(200))
             ) {
                 NormalHeader(onOpenSettings = { viewModel.openSettings() })
+            }
+
+            AnimatedVisibility(
+                visible = !viewModel.isSelectionMode,
+                enter   = fadeIn(tween(200)),
+                exit    = fadeOut(tween(200))
+            ) {
+                TopSearchBar(
+                    searchInput          = viewModel.conversationSearchInput,
+                    onSearchInputChanged = { value ->
+                        viewModel.conversationSearchInput = value
+                        viewModel.conversationSearchQuery = value.trim()
+                    },
+                    onSearchSubmit = {
+                        viewModel.conversationSearchQuery = viewModel.conversationSearchInput.trim()
+                    }
+                )
             }
 
             if (viewModel.shouldShowNotificationWarning) {
@@ -238,8 +264,8 @@ internal fun ConversationListContent(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 12.dp)
-                            .padding(top = 8.dp, bottom = 100.dp),
+                            .padding(horizontal = 8.dp)
+                            .padding(top = 8.dp, bottom = 20.dp),
                         state = conversationListState,
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
@@ -333,26 +359,54 @@ internal fun ConversationListContent(
             }
         }
 
-        // Floating search bar + FAB
-        BottomSearchBar(
-            visible             = isBottomBarVisible && !viewModel.isSelectionMode,
-            searchInput         = viewModel.conversationSearchInput,
-            onSearchInputChanged = { value ->
-                viewModel.conversationSearchInput = value
-                viewModel.conversationSearchQuery = value.trim()
-            },
-            onSearchSubmit = {
-                viewModel.conversationSearchQuery = viewModel.conversationSearchInput.trim()
-                focusManager.clearFocus()
-                keyboardController?.hide()
-            },
-            showNewMessageFab = viewModel.selectedTab == InboxTab.MESSAGES,
-            onNewMessage      = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                viewModel.openNewMessage()
-            },
-            modifier          = Modifier.align(Alignment.BottomCenter)
-        )
+        // Standalone FAB
+        AnimatedVisibility(
+            visible  = isBottomBarVisible && !viewModel.isSelectionMode && viewModel.selectedTab == InboxTab.MESSAGES,
+            enter    = slideInVertically(
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+                initialOffsetY = { it }
+            ) + fadeIn(tween(220)),
+            exit     = slideOutVertically(
+                animationSpec = tween(220),
+                targetOffsetY = { it }
+            ) + fadeOut(tween(180)),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 20.dp)
+        ) {
+            val fabInteractionSource = remember { MutableInteractionSource() }
+            val isFabPressed by fabInteractionSource.collectIsPressedAsState()
+            val fabScale by animateFloatAsState(
+                targetValue   = if (isFabPressed) 0.88f else 1f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                label         = "fabScale"
+            )
+            val fabRotation by animateFloatAsState(
+                targetValue   = if (isFabPressed) 18f else 0f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
+                label         = "fabRotate"
+            )
+            FloatingActionButton(
+                onClick           = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    viewModel.openNewMessage()
+                },
+                interactionSource = fabInteractionSource,
+                modifier          = Modifier
+                    .size(56.dp)
+                    .graphicsLayer {
+                        scaleX    = fabScale
+                        scaleY    = fabScale
+                        rotationZ = fabRotation
+                    },
+                shape          = CircleShape,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor   = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(
+                    painter            = painterResource(id = R.drawable.ic_message_send),
+                    contentDescription = stringResource(R.string.cd_new_message)
+                )
+            }
+        }
     }
 }
 
@@ -366,6 +420,7 @@ private fun SelectionModeHeader(
     onFavorite: () -> Unit,
     onMute: () -> Unit,
     onArchive: () -> Unit,
+    onMarkAsSpam: (() -> Unit)?,
     onBlock: () -> Unit,
     onDelete: () -> Unit,
     hasSelection: Boolean
@@ -434,6 +489,16 @@ private fun SelectionModeHeader(
                     tint = if (hasSelection) MaterialTheme.colorScheme.primary
                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                 )
+            }
+            if (onMarkAsSpam != null) {
+                IconButton(onClick = onMarkAsSpam, enabled = hasSelection) {
+                    Icon(
+                        imageVector = Icons.Outlined.Shield,
+                        contentDescription = "Spam olarak işaretle",
+                        tint = if (hasSelection) MaterialTheme.colorScheme.error
+                               else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                    )
+                }
             }
             IconButton(onClick = onBlock, enabled = hasSelection) {
                 Icon(
@@ -540,10 +605,16 @@ private fun MessagesFilterChipRow(
 @Composable
 private fun NormalHeader(onOpenSettings: () -> Unit) {
     val haptic = LocalHapticFeedback.current
+    var menuExpanded by remember { mutableStateOf(false) }
+    val gearRotation by animateFloatAsState(
+        targetValue   = if (menuExpanded) 90f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label         = "gearRotation"
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, top = 20.dp, end = 16.dp, bottom = 12.dp),
+            .padding(start = 20.dp, top = 20.dp, end = 16.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -553,128 +624,111 @@ private fun NormalHeader(onOpenSettings: () -> Unit) {
             color      = MaterialTheme.colorScheme.onSurface,
             modifier   = Modifier.weight(1f)
         )
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f))
-                .clickable {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onOpenSettings()
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector        = Icons.Outlined.Settings,
-                contentDescription = stringResource(R.string.cd_settings),
-                tint               = MaterialTheme.colorScheme.onSurface,
-                modifier           = Modifier.size(20.dp)
-            )
+        Box {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f))
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        menuExpanded = true
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector        = Icons.Outlined.Settings,
+                    contentDescription = stringResource(R.string.cd_settings),
+                    tint               = MaterialTheme.colorScheme.onSurface,
+                    modifier           = Modifier
+                        .size(20.dp)
+                        .graphicsLayer { rotationZ = gearRotation }
+                )
+            }
+            DropdownMenu(
+                expanded          = menuExpanded,
+                onDismissRequest  = { menuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text         = { Text("Bildirimler") },
+                    leadingIcon  = { Icon(Icons.Outlined.Notifications, contentDescription = null) },
+                    onClick      = { menuExpanded = false; onOpenSettings() }
+                )
+                DropdownMenuItem(
+                    text         = { Text("Engellenen Numaralar") },
+                    leadingIcon  = { Icon(Icons.Outlined.Block, contentDescription = null) },
+                    onClick      = { menuExpanded = false; onOpenSettings() }
+                )
+                DropdownMenuItem(
+                    text         = { Text("Tema") },
+                    leadingIcon  = { Icon(Icons.Outlined.Tune, contentDescription = null) },
+                    onClick      = { menuExpanded = false; onOpenSettings() }
+                )
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text         = { Text("Tüm Ayarlar") },
+                    leadingIcon  = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+                    onClick      = { menuExpanded = false; onOpenSettings() }
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun BottomSearchBar(
-    visible: Boolean,
+private fun TopSearchBar(
     searchInput: String,
     onSearchInputChanged: (String) -> Unit,
-    onSearchSubmit: () -> Unit,
-    showNewMessageFab: Boolean,
-    onNewMessage: () -> Unit,
-    modifier: Modifier = Modifier
+    onSearchSubmit: () -> Unit
 ) {
-    AnimatedVisibility(
-        visible = visible,
-        enter   = slideInVertically(
-            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
-            initialOffsetY = { it }
-        ) + fadeIn(tween(220)),
-        exit    = slideOutVertically(
-            animationSpec = tween(220),
-            targetOffsetY = { it }
-        ) + fadeOut(tween(180)),
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .shadow(elevation = 8.dp, shape = RoundedCornerShape(32.dp), clip = false)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(32.dp))
-                .imePadding()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedTextField(
-                value          = searchInput,
-                onValueChange  = onSearchInputChanged,
-                modifier       = Modifier.weight(1f),
-                singleLine     = true,
-                shape          = RoundedCornerShape(28.dp),
-                placeholder    = {
-                    Text(
-                        text  = stringResource(R.string.search_placeholder),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector        = Icons.Filled.Search,
-                        contentDescription = null,
-                        tint               = MaterialTheme.colorScheme.primary
-                    )
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor    = MaterialTheme.colorScheme.surfaceVariant,
-                    unfocusedContainerColor  = MaterialTheme.colorScheme.surfaceVariant,
-                    focusedBorderColor       = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor     = Color.Transparent,
-                    cursorColor              = MaterialTheme.colorScheme.primary,
-                    focusedTextColor         = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor       = MaterialTheme.colorScheme.onSurface,
-                    focusedPlaceholderColor  = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                ),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() })
+    val focusManager     = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    OutlinedTextField(
+        value         = searchInput,
+        onValueChange = onSearchInputChanged,
+        modifier      = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        singleLine    = true,
+        shape         = RoundedCornerShape(28.dp),
+        placeholder   = {
+            Text(
+                text  = stringResource(R.string.search_placeholder),
+                style = MaterialTheme.typography.bodyMedium
             )
-            if (showNewMessageFab) {
-                val fabInteractionSource = remember { MutableInteractionSource() }
-                val isFabPressed by fabInteractionSource.collectIsPressedAsState()
-                val fabScale by animateFloatAsState(
-                    targetValue   = if (isFabPressed) 0.88f else 1f,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                    label         = "fabScale"
-                )
-                val fabRotation by animateFloatAsState(
-                    targetValue   = if (isFabPressed) 18f else 0f,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
-                    label         = "fabRotate"
-                )
-                FloatingActionButton(
-                    onClick        = onNewMessage,
-                    interactionSource = fabInteractionSource,
-                    modifier       = Modifier
-                        .size(52.dp)
-                        .graphicsLayer {
-                            scaleX    = fabScale
-                            scaleY    = fabScale
-                            rotationZ = fabRotation
-                        },
-                    shape          = CircleShape,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor   = MaterialTheme.colorScheme.onPrimary
-                ) {
-                    Icon(
-                        painter            = painterResource(id = R.drawable.ic_message_send),
-                        contentDescription = stringResource(R.string.cd_new_message)
-                    )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector        = Icons.Filled.Search,
+                contentDescription = null,
+                tint               = MaterialTheme.colorScheme.primary
+            )
+        },
+        trailingIcon = if (searchInput.isNotEmpty()) {
+            {
+                IconButton(onClick = { onSearchInputChanged("") }) {
+                    Icon(Icons.Filled.Close, contentDescription = null)
                 }
             }
-        }
-    }
+        } else null,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor     = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.90f),
+            unfocusedContainerColor   = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.65f),
+            focusedBorderColor        = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor      = Color.Transparent,
+            cursorColor               = MaterialTheme.colorScheme.primary,
+            focusedTextColor          = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor        = MaterialTheme.colorScheme.onSurface,
+            focusedPlaceholderColor   = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        ),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = {
+            onSearchSubmit()
+            focusManager.clearFocus()
+            keyboardController?.hide()
+        })
+    )
 }
 
 @Composable

@@ -19,6 +19,7 @@ import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.FilterKeywordStore
 import com.example.smsfirewall.filter.SmsFilterEngine
 import com.example.smsfirewall.filter.SmsStatus
+import com.example.smsfirewall.filter.SpamClassifier
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationConstants
 import com.example.smsfirewall.notifications.NotificationPreferenceStore
@@ -37,6 +38,7 @@ class SmsReceiver : BroadcastReceiver() {
     @Inject lateinit var mutedSenderStore: MutedSenderStore
     @Inject lateinit var spamRetentionStore: SpamRetentionPreferenceStore
     @Inject lateinit var notificationPreferenceStore: NotificationPreferenceStore
+    @Inject lateinit var spamClassifier: SpamClassifier
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
@@ -54,8 +56,9 @@ class SmsReceiver : BroadcastReceiver() {
         val receivedAt = messages.firstOrNull()?.timestampMillis ?: System.currentTimeMillis()
 
         val filterEngine = SmsFilterEngine(
-            blockedSenders = filterKeywordStore.getBlockedSenders(),
-            blockedKeywords = filterKeywordStore.getBlockedKeywords()
+            blockedSenders  = filterKeywordStore.getBlockedSenders(),
+            blockedKeywords = filterKeywordStore.getBlockedKeywords(),
+            classifier      = spamClassifier
         )
         val decision = filterEngine.evaluate(sender = sender, body = body)
 
