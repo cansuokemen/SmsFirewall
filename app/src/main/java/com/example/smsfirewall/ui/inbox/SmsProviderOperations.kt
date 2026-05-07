@@ -186,6 +186,33 @@ internal suspend fun moveSpamToSystemInbox(
     return true
 }
 
+internal suspend fun restoreStoredSmsToSystemInbox(
+    context: Context,
+    repository: SmsRepository,
+    sms: SmsEntity
+): Boolean {
+    val insertedIntoInbox = withContext(Dispatchers.IO) {
+        val values = ContentValues().apply {
+            put(Telephony.Sms.ADDRESS, sms.sender)
+            put(Telephony.Sms.BODY, sms.body)
+            put(Telephony.Sms.DATE, sms.receivedAt)
+            put(Telephony.Sms.READ, 1)
+            put(Telephony.Sms.SEEN, 1)
+        }
+
+        runCatching {
+            context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values) != null
+        }.onFailure { throwable ->
+            Log.e(TAG, "Failed to restore stored SMS into inbox", throwable)
+        }.getOrDefault(false)
+    }
+
+    if (!insertedIntoInbox) return false
+
+    repository.delete(sms)
+    return true
+}
+
 internal fun sendSmsMessage(
     context: Context,
     destinationAddress: String,

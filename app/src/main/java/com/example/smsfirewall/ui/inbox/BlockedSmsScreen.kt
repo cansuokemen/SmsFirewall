@@ -11,15 +11,12 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -58,6 +55,7 @@ fun BlockedSmsScreen(
     val regularMessages = systemResult.messages
     val unreadIds       = systemResult.unreadIds
     val spamMessages by viewModel.repository.getByStatus(SmsStatus.BLOCK).collectAsState(initial = emptyList())
+    val trashMessages by viewModel.repository.getByStatus(SmsStatus.TRASH).collectAsState(initial = emptyList())
 
     val blockedSenders = viewModel.blockedSenders
 
@@ -77,8 +75,16 @@ fun BlockedSmsScreen(
         }
     }
 
-    val visibleMessages    = if (viewModel.selectedTab == InboxTab.MESSAGES) filteredRegularMessages else filteredSpamMessages
-    val currentUnreadIds   = if (viewModel.selectedTab == InboxTab.MESSAGES) unreadIds else emptySet()
+    val visibleMessages = when (viewModel.selectedTab) {
+        InboxTab.SPAM -> filteredSpamMessages
+        InboxTab.TRASH -> trashMessages
+        else -> filteredRegularMessages
+    }
+    val currentUnreadIds = if (viewModel.selectedTab == InboxTab.MESSAGES || viewModel.selectedTab == InboxTab.ARCHIVE) {
+        unreadIds
+    } else {
+        emptySet()
+    }
     val unknownSenderLabel = stringResource(R.string.unknown_sender)
 
     val allConversations = remember(visibleMessages, currentUnreadIds, unknownSenderLabel, viewModel.conversationMetaToken) {
@@ -90,13 +96,15 @@ fun BlockedSmsScreen(
     val visibleConversations = remember(allConversations) {
         allConversations.filterNot { it.isArchived }
     }
-    val pendingDeleteKeys = remember(viewModel.pendingDelete) {
-        viewModel.pendingDelete?.conversations?.map { it.senderKey }?.toSet() ?: emptySet()
+    val baseConversationsForTab = remember(viewModel.selectedTab, visibleConversations, archivedConversations, allConversations) {
+        when (viewModel.selectedTab) {
+            InboxTab.MESSAGES -> visibleConversations
+            InboxTab.ARCHIVE -> archivedConversations
+            InboxTab.SPAM,
+            InboxTab.TRASH -> allConversations
+        }
     }
-    val displayConversations = remember(visibleConversations, pendingDeleteKeys) {
-        if (pendingDeleteKeys.isEmpty()) visibleConversations
-        else visibleConversations.filter { it.senderKey !in pendingDeleteKeys }
-    }
+    val displayConversations = baseConversationsForTab
     val tabFilteredConversations = remember(displayConversations, viewModel.selectedTab, viewModel.messagesFilter) {
         if (viewModel.selectedTab != InboxTab.MESSAGES) displayConversations
         else when (viewModel.messagesFilter) {
@@ -110,8 +118,8 @@ fun BlockedSmsScreen(
         if (query.isBlank()) tabFilteredConversations
         else tabFilteredConversations.filter { it.matchesSearchQuery(query) }
     }
-    val openedConversation = remember(viewModel.openedConversationKey, visibleConversations) {
-        viewModel.openedConversationKey?.let { key -> visibleConversations.firstOrNull { it.senderKey == key } }
+    val openedConversation = remember(viewModel.openedConversationKey, baseConversationsForTab) {
+        viewModel.openedConversationKey?.let { key -> baseConversationsForTab.firstOrNull { it.senderKey == key } }
     }
 
     val conversationListState = rememberLazyListState()
@@ -146,7 +154,9 @@ fun BlockedSmsScreen(
     }
 
     LaunchedEffect(viewModel.selectedTab) {
-        if (viewModel.selectedTab == InboxTab.SPAM) {
+        if (viewModel.selectedTab == InboxTab.SPAM ||
+            viewModel.selectedTab == InboxTab.ARCHIVE ||
+            viewModel.selectedTab == InboxTab.TRASH) {
             conversationListState.scrollToItem(0)
         }
     }
@@ -169,31 +179,10 @@ fun BlockedSmsScreen(
         }
     }
 
-    val snackbarHostState  = remember { SnackbarHostState() }
-    val undoLabel          = stringResource(R.string.undo)
-    val deletedSingleLabel = stringResource(R.string.conversation_deleted)
-
     var backgroundSheetTarget by remember { mutableStateOf<BackgroundSheetTarget?>(null) }
 
-    LaunchedEffect(viewModel.pendingDelete) {
-        val pending = viewModel.pendingDelete ?: return@LaunchedEffect
-        val count   = pending.conversations.size
-        val message = if (count == 1) deletedSingleLabel
-                      else context.getString(R.string.conversations_deleted, count)
-
-        val result = snackbarHostState.showSnackbar(
-            message     = message,
-            actionLabel = undoLabel,
-            duration    = SnackbarDuration.Short
-        )
-        when (result) {
-            SnackbarResult.ActionPerformed -> viewModel.undoDelete()
-            SnackbarResult.Dismissed       -> viewModel.commitPendingDelete()
-        }
-    }
-
     Scaffold(
-        snackbarHost   = { SnackbarHost(hostState = snackbarHostState) },
+        contentWindowInsets = WindowInsets(0),
         containerColor = Color.Transparent,
         modifier       = modifier.fillMaxSize()
     ) { innerPadding ->
@@ -232,7 +221,7 @@ fun BlockedSmsScreen(
                             ConversationDetailScreen(
                                 conversation      = conv,
                                 contactName       = viewModel.getContactName(conv.displaySender),
-                                canSendMessage    = viewModel.selectedTab == InboxTab.MESSAGES,
+                                canSendMessage    = viewModel.selectedTab == InboxTab.MESSAGES || viewModel.selectedTab == InboxTab.ARCHIVE,
                                 isSpamConversation = viewModel.selectedTab == InboxTab.SPAM,
                                 backgroundSpec     = viewModel.backgroundFor(conv.displaySender),
                                 onChangeBackground = {
@@ -292,6 +281,8 @@ fun BlockedSmsScreen(
                             onSpamRetentionChanged  = { days -> viewModel.setSpamRetention(days) },
                             soundEnabled            = viewModel.notifSoundEnabled,
                             onSoundChanged          = { viewModel.setNotifSound(it) },
+                            soundUriString          = viewModel.notifSoundUriString,
+                            onSoundUriChanged       = { uri -> viewModel.setNotifSoundUri(uri) },
                             vibrationEnabled        = viewModel.notifVibrationEnabled,
                             onVibrationChanged      = { viewModel.setNotifVibration(it) },
                             quietHoursEnabled       = viewModel.notifQuietHoursEnabled,
@@ -337,7 +328,7 @@ fun BlockedSmsScreen(
                             messagesUnreadCount   = msgUnreadCount,
                             messagesFavoriteCount = msgFavoriteCount,
                             archivedCount         = archivedConversations.size,
-                            onOpenArchive         = { viewModel.openArchive() }
+                            onOpenArchive         = { viewModel.selectTab(InboxTab.ARCHIVE) }
                         )
                     }
                 }

@@ -46,6 +46,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Deselect
@@ -53,6 +54,8 @@ import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material.icons.outlined.Settings
@@ -83,6 +86,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
@@ -105,6 +109,16 @@ import com.example.smsfirewall.R
 import com.example.smsfirewall.notifications.NotificationConstants
 import com.example.smsfirewall.ui.background.AppBackground
 
+private sealed class SelectionArchiveAction(
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val contentDescriptionRes: Int,
+    val onClick: () -> Unit
+) {
+    class Archive(onClick: () -> Unit) : SelectionArchiveAction(Icons.Outlined.Archive, R.string.cd_archive, onClick)
+    class Unarchive(onClick: () -> Unit) : SelectionArchiveAction(Icons.Outlined.Unarchive, R.string.cd_unarchive, onClick)
+    class Restore(onClick: () -> Unit) : SelectionArchiveAction(Icons.Outlined.RestoreFromTrash, R.string.cd_restore_from_trash, onClick)
+}
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 internal fun ConversationListContent(
@@ -123,6 +137,7 @@ internal fun ConversationListContent(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val haptic = LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
 
     val openNotificationSettings: () -> Unit = {
         val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -171,7 +186,12 @@ internal fun ConversationListContent(
                     onPin = { viewModel.togglePinSelected(filteredConversations) },
                     onFavorite = { viewModel.toggleFavoriteSelected(filteredConversations) },
                     onMute = { viewModel.toggleMuteSelected(filteredConversations) },
-                    onArchive = { viewModel.archiveSelected(filteredConversations) },
+                    archiveAction = when (viewModel.selectedTab) {
+                        InboxTab.MESSAGES -> SelectionArchiveAction.Archive { viewModel.archiveSelected(filteredConversations) }
+                        InboxTab.ARCHIVE -> SelectionArchiveAction.Unarchive { viewModel.unarchiveSelected(filteredConversations) }
+                        InboxTab.TRASH -> SelectionArchiveAction.Restore { viewModel.restoreTrashSelected(filteredConversations) }
+                        InboxTab.SPAM -> null
+                    },
                     onMarkAsSpam = if (viewModel.selectedTab == InboxTab.MESSAGES) {
                         { viewModel.markSelectedAsSpam(filteredConversations) }
                     } else null,
@@ -257,6 +277,8 @@ internal fun ConversationListContent(
                     when {
                         viewModel.conversationSearchQuery.isNotBlank() -> SearchEmptyState()
                         viewModel.selectedTab == InboxTab.MESSAGES     -> MessagesEmptyState()
+                        viewModel.selectedTab == InboxTab.ARCHIVE      -> ArchiveEmptyState()
+                        viewModel.selectedTab == InboxTab.TRASH        -> TrashEmptyState()
                         else                                            -> SpamEmptyState()
                     }
                 } else {
@@ -361,6 +383,37 @@ internal fun ConversationListContent(
 
         // Standalone FAB
         AnimatedVisibility(
+            visible = conversationListState.firstVisibleItemIndex > 1 &&
+                !viewModel.isSelectionMode &&
+                viewModel.selectedTab == InboxTab.MESSAGES,
+            enter = slideInVertically(
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+                initialOffsetY = { it }
+            ) + fadeIn(tween(220)),
+            exit = slideOutVertically(
+                animationSpec = tween(220),
+                targetOffsetY = { it }
+            ) + fadeOut(tween(180)),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp)
+        ) {
+            FloatingActionButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    coroutineScope.launch { conversationListState.animateScrollToItem(0) }
+                },
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
+                contentColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.KeyboardArrowUp,
+                    contentDescription = stringResource(R.string.cd_scroll_to_top)
+                )
+            }
+        }
+
+        AnimatedVisibility(
             visible  = isBottomBarVisible && !viewModel.isSelectionMode && viewModel.selectedTab == InboxTab.MESSAGES,
             enter    = slideInVertically(
                 animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
@@ -419,7 +472,7 @@ private fun SelectionModeHeader(
     onPin: () -> Unit,
     onFavorite: () -> Unit,
     onMute: () -> Unit,
-    onArchive: () -> Unit,
+    archiveAction: SelectionArchiveAction?,
     onMarkAsSpam: (() -> Unit)?,
     onBlock: () -> Unit,
     onDelete: () -> Unit,
@@ -482,13 +535,15 @@ private fun SelectionModeHeader(
                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                 )
             }
-            IconButton(onClick = onArchive, enabled = hasSelection) {
-                Icon(
-                    imageVector = Icons.Outlined.Archive,
-                    contentDescription = stringResource(R.string.cd_archive),
-                    tint = if (hasSelection) MaterialTheme.colorScheme.primary
-                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                )
+            if (archiveAction != null) {
+                IconButton(onClick = archiveAction.onClick, enabled = hasSelection) {
+                    Icon(
+                        imageVector = archiveAction.icon,
+                        contentDescription = stringResource(archiveAction.contentDescriptionRes),
+                        tint = if (hasSelection) MaterialTheme.colorScheme.primary
+                               else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                    )
+                }
             }
             if (onMarkAsSpam != null) {
                 IconButton(onClick = onMarkAsSpam, enabled = hasSelection) {
@@ -786,6 +841,8 @@ private fun InboxSegmentedControl(
                         imageVector = when (tab) {
                             InboxTab.MESSAGES -> Icons.Outlined.MailOutline
                             InboxTab.SPAM     -> Icons.Outlined.Shield
+                            InboxTab.ARCHIVE  -> Icons.Outlined.Archive
+                            InboxTab.TRASH    -> Icons.Outlined.DeleteSweep
                         },
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),

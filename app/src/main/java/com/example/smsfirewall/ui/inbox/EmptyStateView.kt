@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Shield
@@ -151,6 +153,26 @@ internal fun SearchEmptyState(modifier: Modifier = Modifier) {
         icon     = Icons.Outlined.Search,
         title    = stringResource(R.string.empty_search_title),
         subtitle = stringResource(R.string.empty_search_subtitle),
+        modifier = modifier
+    )
+}
+
+@Composable
+internal fun ArchiveEmptyState(modifier: Modifier = Modifier) {
+    EmptyStateView(
+        icon     = Icons.Outlined.Archive,
+        title    = stringResource(R.string.archive_empty_title),
+        subtitle = stringResource(R.string.archive_empty_subtitle),
+        modifier = modifier
+    )
+}
+
+@Composable
+internal fun TrashEmptyState(modifier: Modifier = Modifier) {
+    EmptyStateView(
+        icon     = Icons.Outlined.DeleteSweep,
+        title    = stringResource(R.string.trash_empty_title),
+        subtitle = stringResource(R.string.trash_empty_subtitle),
         modifier = modifier
     )
 }

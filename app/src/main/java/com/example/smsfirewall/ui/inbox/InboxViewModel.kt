@@ -3,6 +3,7 @@ package com.example.smsfirewall.ui.inbox
 import android.app.Application
 import android.app.NotificationManager
 import android.database.ContentObserver
+import android.media.AudioAttributes
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -31,8 +32,6 @@ import com.example.smsfirewall.notifications.NotificationPreferenceStore
 import com.example.smsfirewall.util.normalizeSender
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -161,12 +160,8 @@ class InboxViewModel @Inject constructor(
         val tab: InboxTab
     )
 
-    var pendingDelete by mutableStateOf<PendingDelete?>(null)
-        private set
-    private var pendingDeleteJob: Job? = null
     private companion object {
         const val MAX_CONTACT_CACHE_SIZE = 256
-        const val UNDO_TIMEOUT_MS = 4000L
     }
 
     // --- Yenileme ---
@@ -194,6 +189,9 @@ class InboxViewModel @Inject constructor(
     var notifSoundEnabled by mutableStateOf(notificationPreferenceStore.isSoundEnabled())
         private set
 
+    var notifSoundUriString by mutableStateOf(notificationPreferenceStore.getSoundUriString())
+        private set
+
     var notifVibrationEnabled by mutableStateOf(notificationPreferenceStore.isVibrationEnabled())
         private set
 
@@ -209,11 +207,19 @@ class InboxViewModel @Inject constructor(
     fun setNotifSound(enabled: Boolean) {
         notificationPreferenceStore.setSoundEnabled(enabled)
         notifSoundEnabled = enabled
+        recreateNotificationChannel()
+    }
+
+    fun setNotifSoundUri(uri: Uri?) {
+        notificationPreferenceStore.setSoundUri(uri)
+        notifSoundUriString = notificationPreferenceStore.getSoundUriString()
+        if (uri != null) setNotifSound(true) else recreateNotificationChannel()
     }
 
     fun setNotifVibration(enabled: Boolean) {
         notificationPreferenceStore.setVibrationEnabled(enabled)
         notifVibrationEnabled = enabled
+        recreateNotificationChannel()
     }
 
     fun setNotifQuietHours(enabled: Boolean) {
@@ -229,6 +235,34 @@ class InboxViewModel @Inject constructor(
     fun setNotifQuietEnd(hour: Int, minute: Int) {
         notificationPreferenceStore.setQuietHoursEnd(hour, minute)
         notifQuietEnd = hour to minute
+    }
+
+    private fun recreateNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        manager.deleteNotificationChannel(NotificationConstants.ALLOWED_SMS_CHANNEL_ID)
+        val channel = android.app.NotificationChannel(
+            NotificationConstants.ALLOWED_SMS_CHANNEL_ID,
+            context.getString(com.example.smsfirewall.R.string.notification_channel_name),
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            if (notificationPreferenceStore.isSoundEnabled()) {
+                notificationPreferenceStore.getSoundUri()?.let { uri ->
+                    setSound(
+                        uri,
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                }
+            } else {
+                setSound(null, null)
+            }
+            enableVibration(notificationPreferenceStore.isVibrationEnabled())
+            enableLights(true)
+        }
+        manager.createNotificationChannel(channel)
     }
 
     // --- Arka plan tercihleri ---
@@ -441,7 +475,7 @@ class InboxViewModel @Inject constructor(
         isSelectionMode = false
         selectedConversationKeys = emptySet()
         if (toDelete.isNotEmpty()) {
-            schedulePendingDelete(PendingDelete(toDelete, selectedTab))
+            deleteConversationsNow(PendingDelete(toDelete, selectedTab))
         }
     }
 
@@ -491,6 +525,21 @@ class InboxViewModel @Inject constructor(
         exitSelectionMode()
     }
 
+    fun restoreTrashSelected(visibleConversations: List<SmsConversation>) {
+        val targets = visibleConversations.filter { it.senderKey in selectedConversationKeys }
+        if (targets.isEmpty()) return
+        exitSelectionMode()
+        viewModelScope.launch {
+            for (conv in targets) {
+                for (sms in conv.messages) {
+                    restoreStoredSmsToSystemInbox(context, repository, sms)
+                }
+            }
+            refreshSystemMessages()
+            selectTab(InboxTab.MESSAGES)
+        }
+    }
+
     fun openArchive() {
         exitSelectionMode()
         isArchiveOpen = true
@@ -505,35 +554,11 @@ class InboxViewModel @Inject constructor(
 
     fun deleteConversation(conversation: SmsConversation) {
         actionRevealedConversationKey = null
-        schedulePendingDelete(PendingDelete(listOf(conversation), selectedTab))
+        deleteConversationsNow(PendingDelete(listOf(conversation), selectedTab))
     }
 
-    fun undoDelete() {
-        pendingDeleteJob?.cancel()
-        pendingDelete = null
-        pendingCrumpleAnim = null
-        pendingShredderAnim = null
-    }
-
-    fun commitPendingDelete() {
-        val delete = pendingDelete ?: return
-        pendingDeleteJob?.cancel()
-        pendingDelete = null
+    private fun deleteConversationsNow(delete: PendingDelete) {
         viewModelScope.launch {
-            performDelete(delete)
-        }
-    }
-
-    private fun schedulePendingDelete(delete: PendingDelete) {
-        // Eğer önceki bir pending varsa, önce onu commit et
-        pendingDelete?.let { previous ->
-            pendingDeleteJob?.cancel()
-            viewModelScope.launch { performDelete(previous) }
-        }
-        pendingDelete = delete
-        pendingDeleteJob = viewModelScope.launch {
-            delay(UNDO_TIMEOUT_MS)
-            pendingDelete = null
             performDelete(delete)
         }
     }
@@ -541,13 +566,37 @@ class InboxViewModel @Inject constructor(
     private suspend fun performDelete(delete: PendingDelete) {
         for (conv in delete.conversations) {
             for (sms in conv.messages) {
-                if (delete.tab == InboxTab.MESSAGES) {
+                if (delete.tab == InboxTab.MESSAGES || delete.tab == InboxTab.ARCHIVE) {
+                    repository.insert(
+                        SmsEntity(
+                            id = 0,
+                            sender = sms.sender,
+                            body = sms.body,
+                            receivedAt = sms.receivedAt,
+                            status = SmsStatus.TRASH,
+                            reason = sms.reason
+                        )
+                    )
                     deleteSmsFromSystemProvider(context, sms.id)
+                    conversationMetaStore.setArchived(conv.displaySender, false)
+                } else if (delete.tab == InboxTab.SPAM) {
+                    repository.insert(
+                        SmsEntity(
+                            id = 0,
+                            sender = sms.sender,
+                            body = sms.body,
+                            receivedAt = sms.receivedAt,
+                            status = SmsStatus.TRASH,
+                            reason = sms.reason
+                        )
+                    )
+                    repository.delete(sms)
                 } else {
                     repository.delete(sms)
                 }
             }
         }
+        bumpMeta()
     }
 
     fun muteNotifications(sender: String) {
@@ -603,8 +652,30 @@ class InboxViewModel @Inject constructor(
 
     fun deleteSingleMessage(sms: SmsEntity) {
         viewModelScope.launch {
-            if (selectedTab == InboxTab.MESSAGES) {
+            if (selectedTab == InboxTab.MESSAGES || selectedTab == InboxTab.ARCHIVE) {
+                repository.insert(
+                    SmsEntity(
+                        id = 0,
+                        sender = sms.sender,
+                        body = sms.body,
+                        receivedAt = sms.receivedAt,
+                        status = SmsStatus.TRASH,
+                        reason = sms.reason
+                    )
+                )
                 deleteSmsFromSystemProvider(context, sms.id)
+            } else if (selectedTab == InboxTab.SPAM) {
+                repository.insert(
+                    SmsEntity(
+                        id = 0,
+                        sender = sms.sender,
+                        body = sms.body,
+                        receivedAt = sms.receivedAt,
+                        status = SmsStatus.TRASH,
+                        reason = sms.reason
+                    )
+                )
+                repository.delete(sms)
             } else {
                 repository.delete(sms)
             }

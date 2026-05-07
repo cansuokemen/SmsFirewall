@@ -146,6 +146,7 @@ class SmsReceiver : BroadcastReceiver() {
 
         val soundEnabled = notificationPreferenceStore.isSoundEnabled()
         val vibrationEnabled = notificationPreferenceStore.isVibrationEnabled()
+        val customSoundUri = notificationPreferenceStore.getSoundUri()
 
         val builder = NotificationCompat.Builder(context, NotificationConstants.ALLOWED_SMS_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_email)
@@ -167,11 +168,21 @@ class SmsReceiver : BroadcastReceiver() {
             builder.setSound(null)
         } else if (!vibrationEnabled) {
             builder.setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            builder.setDefaults(NotificationCompat.DEFAULT_SOUND)
+            if (customSoundUri != null) {
+                builder.setDefaults(0)
+                builder.setSound(customSoundUri)
+            } else {
+                builder.setDefaults(NotificationCompat.DEFAULT_SOUND)
+            }
             builder.setVibrate(null)
         } else {
             builder.setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            builder.setDefaults(NotificationCompat.DEFAULT_ALL)
+            if (customSoundUri != null) {
+                builder.setDefaults(NotificationCompat.DEFAULT_VIBRATE)
+                builder.setSound(customSoundUri)
+            } else {
+                builder.setDefaults(NotificationCompat.DEFAULT_ALL)
+            }
         }
 
         NotificationManagerCompat.from(context).notify(System.currentTimeMillis().toInt(), builder.build())

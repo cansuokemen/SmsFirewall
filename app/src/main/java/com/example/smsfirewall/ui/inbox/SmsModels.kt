@@ -11,7 +11,9 @@ internal const val UNREAD_BADGE_MAX = 99
 
 enum class InboxTab(val titleResId: Int) {
     MESSAGES(R.string.tab_messages),
-    SPAM(R.string.tab_spam)
+    SPAM(R.string.tab_spam),
+    ARCHIVE(R.string.tab_archive),
+    TRASH(R.string.tab_trash)
 }
 
 enum class MessagesFilter(val titleResId: Int) {

@@ -12,6 +12,7 @@ object SmsStatus {
     const val ALLOW = "ALLOW"
     const val BLOCK = "BLOCK"
     const val REVIEW = "REVIEW"
+    const val TRASH = "TRASH"
 }
 
 class SmsFilterEngine(

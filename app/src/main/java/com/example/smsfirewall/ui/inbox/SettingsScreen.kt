@@ -1,7 +1,12 @@
 package com.example.smsfirewall.ui.inbox
 
 import android.app.TimePickerDialog
+import android.content.Intent
+import android.media.RingtoneManager
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -13,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -52,6 +58,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -94,6 +101,8 @@ fun SettingsScreen(
     onSpamRetentionChanged: (Int) -> Unit,
     soundEnabled: Boolean,
     onSoundChanged: (Boolean) -> Unit,
+    soundUriString: String?,
+    onSoundUriChanged: (Uri?) -> Unit,
     vibrationEnabled: Boolean,
     onVibrationChanged: (Boolean) -> Unit,
     quietHoursEnabled: Boolean,
@@ -110,8 +119,32 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val haptic  = LocalHapticFeedback.current
+    val soundUri = remember(soundUriString) { soundUriString?.let(Uri::parse) }
+    val soundTitle = remember(soundUriString) {
+        soundUri?.let { uri ->
+            runCatching { RingtoneManager.getRingtone(context, uri)?.getTitle(context) }
+                .getOrNull()
+        } ?: context.getString(R.string.notification_sound_default)
+    }
+    val soundPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        onSoundUriChanged(uri)
+    }
+    val openSoundPicker = {
+        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+            putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, context.getString(R.string.notification_sound_pick))
+            putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, soundUri)
+            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+        }
+        soundPickerLauncher.launch(intent)
+    }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = {
@@ -287,6 +320,32 @@ fun SettingsScreen(
                             checked        = soundEnabled,
                             onCheckedChange = onSoundChanged
                         )
+                        AnimatedVisibility(visible = soundEnabled) {
+                            Column {
+                                SettingsDivider()
+                                ListItem(
+                                    modifier = Modifier.clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        openSoundPicker()
+                                    },
+                                    headlineContent = { Text(stringResource(R.string.notification_sound_custom)) },
+                                    supportingContent = { Text(soundTitle) },
+                                    leadingContent = {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Outlined.VolumeUp,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    trailingContent = {
+                                        TextButton(onClick = openSoundPicker) {
+                                            Text(stringResource(R.string.notification_sound_pick_short))
+                                        }
+                                    },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                )
+                            }
+                        }
                         SettingsDivider()
                         SwitchSettingItem(
                             icon           = Icons.Outlined.Vibration,

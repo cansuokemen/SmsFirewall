@@ -4,6 +4,8 @@
     <!-- Tabs -->
     <string name="tab_messages">Mesajlar</string>
     <string name="tab_spam">Spam</string>
+    <string name="tab_archive">Arşiv</string>
+    <string name="tab_trash">Çöp</string>
 
     <!-- Filters -->
     <string name="filter_all">Tümü</string>
@@ -25,6 +27,8 @@
     <string name="archived_conversations">Arşivlenenler</string>
     <string name="archive_empty_title">Arşiv boş</string>
     <string name="archive_empty_subtitle">Arşivlediğiniz sohbetler burada görünecek</string>
+    <string name="trash_empty_title">Çöp kutusu boş</string>
+    <string name="trash_empty_subtitle">Sildiğiniz sohbetler burada görünecek</string>
     <string name="cd_pin">Sabitle</string>
     <string name="cd_favorite">Favoriye ekle</string>
     <string name="cd_archive">Arşivle</string>
@@ -199,4 +203,11 @@
     <string name="background_conversation_title">Sohbet arka planı</string>
     <string name="background_conversation_reset">Ana menüye eşitle</string>
     <string name="cd_more_options">Daha fazla seçenek</string>
+    <string name="notification_sound_custom">Bildirim sesi</string>
+    <string name="notification_sound_default">Varsayilan sistem sesi</string>
+    <string name="notification_sound_pick">Bildirim sesi sec</string>
+    <string name="notification_sound_pick_short">Sec</string>
+    <string name="cd_scroll_to_top">Yukari cik</string>
+    <string name="restore_from_trash">Copten Cikar</string>
+    <string name="cd_restore_from_trash">Copten cikar</string>
 </resources>
