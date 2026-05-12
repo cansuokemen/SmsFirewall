@@ -25,7 +25,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,6 +41,9 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -46,6 +51,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -101,7 +107,10 @@ internal fun ConversationDetailScreen(
     bubbleStyle: BubbleStyle,
     onChangeBackground: () -> Unit,
     onResetBackground: () -> Unit,
-    callbacks: DetailScreenCallbacks
+    callbacks: DetailScreenCallbacks,
+    detailSearchQuery: String = "",
+    onDetailSearchChange: (String) -> Unit = {},
+    onDetailSearchClear: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var draftMessage by remember(conversation.senderKey) { mutableStateOf("") }
@@ -110,7 +119,12 @@ internal fun ConversationDetailScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val haptic          = LocalHapticFeedback.current
     val density         = LocalDensity.current
-    val displayMessages = remember(conversation.messages) { conversation.messages.asReversed() }
+    val allMessages     = remember(conversation.messages) { conversation.messages.asReversed() }
+    val displayMessages = remember(allMessages, detailSearchQuery) {
+        val q = detailSearchQuery.trim()
+        if (q.isBlank()) allMessages else allMessages.filter { it.body.contains(q, ignoreCase = true) }
+    }
+    var searchBarVisible by remember { mutableStateOf(false) }
     val isKeyboardVisible = WindowInsets.ime.getBottom(density) > 0
 
     val sendButtonScale by animateFloatAsState(
@@ -258,6 +272,15 @@ internal fun ConversationDetailScreen(
                 }
             },
             actions = {
+                IconButton(onClick = {
+                    searchBarVisible = !searchBarVisible
+                    if (!searchBarVisible) onDetailSearchClear()
+                }) {
+                    Icon(
+                        imageVector        = if (searchBarVisible) Icons.Filled.Close else Icons.Outlined.Search,
+                        contentDescription = stringResource(R.string.cd_search)
+                    )
+                }
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(
@@ -290,6 +313,35 @@ internal fun ConversationDetailScreen(
                 containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)
             )
         )
+
+        AnimatedVisibility(
+            visible = searchBarVisible,
+            enter   = fadeIn(tween(180)) + androidx.compose.animation.expandVertically(),
+            exit    = fadeOut(tween(180)) + androidx.compose.animation.shrinkVertically(tween(180))
+        ) {
+            OutlinedTextField(
+                value         = detailSearchQuery,
+                onValueChange = onDetailSearchChange,
+                modifier      = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                singleLine    = true,
+                shape         = RoundedCornerShape(24.dp),
+                placeholder   = { Text("Mesajlarda ara...") },
+                leadingIcon   = {
+                    Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
+                },
+                trailingIcon  = if (detailSearchQuery.isNotEmpty()) ({
+                    IconButton(onClick = onDetailSearchClear) {
+                        Icon(imageVector = Icons.Filled.Close, contentDescription = null)
+                    }
+                }) else null,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor   = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.74f)
+                )
+            )
+        }
 
         LazyColumn(
             modifier = Modifier

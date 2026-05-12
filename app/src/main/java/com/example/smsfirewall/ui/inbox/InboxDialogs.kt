@@ -18,6 +18,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -49,7 +51,8 @@ internal fun MessageOptionsDialog(
     onDismiss: () -> Unit,
     onCopy: (SmsEntity) -> Unit,
     onDelete: (SmsEntity) -> Unit,
-    onBlockSender: ((SmsEntity) -> Unit)? = null
+    onBlockSender: ((SmsEntity) -> Unit)? = null,
+    onStarToggle: ((SmsEntity) -> Unit)? = null
 ) {
     if (sms == null) return
     val haptic = LocalHapticFeedback.current
@@ -59,7 +62,33 @@ internal fun MessageOptionsDialog(
         title = { Text(text = stringResource(R.string.message_options)) },
         text = {
             Column {
-                DialogActionRow(index = 0) {
+                if (onStarToggle != null) {
+                    DialogActionRow(index = 0) {
+                        TextButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onStarToggle(sms)
+                                onDismiss()
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Start,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (sms.isStarred) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(text = if (sms.isStarred) "Yıldızı kaldır" else "Yıldızla")
+                            }
+                        }
+                    }
+                }
+                DialogActionRow(index = if (onStarToggle != null) 1 else 0) {
                     TextButton(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -82,7 +111,7 @@ internal fun MessageOptionsDialog(
                         }
                     }
                 }
-                DialogActionRow(index = 1) {
+                DialogActionRow(index = if (onStarToggle != null) 2 else 1) {
                     TextButton(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -110,7 +139,7 @@ internal fun MessageOptionsDialog(
                     }
                 }
                 if (onBlockSender != null) {
-                    DialogActionRow(index = 2) {
+                    DialogActionRow(index = if (onStarToggle != null) 3 else 2) {
                         TextButton(
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)

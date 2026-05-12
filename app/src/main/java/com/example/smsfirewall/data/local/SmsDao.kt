@@ -44,4 +44,7 @@ interface SmsDao {
 
     @Delete
     suspend fun deleteAll(messages: List<SmsEntity>)
+
+    @Query("UPDATE sms_messages SET is_starred = :starred WHERE id = :id")
+    suspend fun setStarred(id: Long, starred: Boolean)
 }

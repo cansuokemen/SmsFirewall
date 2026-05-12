@@ -9,15 +9,22 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import android.content.Intent
+import android.net.Uri
+import android.util.Patterns
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -25,6 +32,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -102,6 +116,7 @@ internal fun DetailMessageBubble(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = if (isOutgoing) Arrangement.End else Arrangement.Start
     ) {
+        Box {
         Column(
             modifier = Modifier
                 .widthIn(max = 280.dp)
@@ -137,8 +152,9 @@ internal fun DetailMessageBubble(
                 )
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            Text(
-                text  = sms.body.ifBlank { stringResource(R.string.empty_message_placeholder) },
+            val bodyText = sms.body.ifBlank { stringResource(R.string.empty_message_placeholder) }
+            LinkedText(
+                text  = bodyText,
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontSize = MaterialTheme.typography.bodyMedium.fontSize * bodyScale
                 ),
@@ -155,6 +171,18 @@ internal fun DetailMessageBubble(
                     .padding(top = 3.dp)
             )
         }
+        if (sms.isStarred) {
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = null,
+                tint = androidx.compose.ui.graphics.Color(0xFFFFC107),
+                modifier = Modifier
+                    .size(14.dp)
+                    .align(if (isOutgoing) Alignment.TopStart else Alignment.TopEnd)
+                    .offset(x = if (isOutgoing) (-2).dp else 2.dp, y = (-2).dp)
+            )
+        }
+        } // Box
     }
 }
 
@@ -264,5 +292,37 @@ internal fun SwipeActionButton(
             contentDescription = contentDescription,
             tint               = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+private val URL_REGEX = Patterns.WEB_URL.toRegex()
+
+@Composable
+internal fun LinkedText(text: String, style: TextStyle, color: Color) {
+    val context = LocalContext.current
+    val annotated = buildAnnotatedString {
+        var last = 0
+        URL_REGEX.findAll(text).forEach { match ->
+            append(text.substring(last, match.range.first))
+            pushStringAnnotation("URL", match.value)
+            withStyle(SpanStyle(color = Color(0xFF4FC3F7), textDecoration = TextDecoration.Underline)) {
+                append(match.value)
+            }
+            pop()
+            last = match.range.last + 1
+        }
+        if (last < text.length) append(text.substring(last))
+    }
+    if (annotated.getStringAnnotations("URL", 0, annotated.length).isEmpty()) {
+        Text(text = text, style = style, color = color)
+    } else {
+        ClickableText(text = annotated, style = style.copy(color = color)) { offset ->
+            annotated.getStringAnnotations("URL", offset, offset).firstOrNull()?.let { ann ->
+                runCatching {
+                    val uri = if (ann.item.startsWith("http")) ann.item else "https://${ann.item}"
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri)))
+                }
+            }
+        }
     }
 }

@@ -251,8 +251,11 @@ fun BlockedSmsScreen(
                                 onResetBackground = {
                                     viewModel.resetConversationBackground(conv.displaySender)
                                 },
+                                detailSearchQuery   = viewModel.detailSearchQuery,
+                                onDetailSearchChange = { viewModel.setDetailSearch(it) },
+                                onDetailSearchClear  = { viewModel.clearDetailSearch() },
                                 callbacks = DetailScreenCallbacks(
-                                    onBack            = { viewModel.closeConversation() },
+                                    onBack            = { viewModel.closeConversation(); viewModel.clearDetailSearch() },
                                     onMessageLongPress = { sms -> viewModel.selectedForDelete = sms },
                                     onSpamMessageClick = { sms -> viewModel.openedSpamMessage = sms },
                                     onMarkAsNotSpam   = { sms ->
@@ -397,6 +400,10 @@ fun BlockedSmsScreen(
                 viewModel.pendingBlockSenders = listOf(sms.sender)
                 viewModel.showBlockConfirm    = true
                 viewModel.selectedForDelete   = null
+            },
+            onStarToggle = { sms ->
+                viewModel.toggleMessageStar(sms)
+                viewModel.selectedForDelete = null
             }
         )
 

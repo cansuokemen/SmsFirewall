@@ -101,6 +101,13 @@ class InboxViewModel @Inject constructor(
     var conversationSearchInput by mutableStateOf("")
     var conversationSearchQuery by mutableStateOf("")
 
+    // Sohbet detayı içi arama
+    var detailSearchQuery by mutableStateOf("")
+        private set
+
+    fun setDetailSearch(q: String) { detailSearchQuery = q }
+    fun clearDetailSearch() { detailSearchQuery = "" }
+
     fun selectMessagesFilter(filter: MessagesFilter) {
         messagesFilter = filter
     }
@@ -498,6 +505,12 @@ class InboxViewModel @Inject constructor(
         selectedTab = tab
         isSelectionMode = false
         selectedConversationKeys = emptySet()
+    }
+
+    fun toggleMessageStar(sms: SmsEntity) {
+        viewModelScope.launch {
+            repository.setMessageStarred(sms.id, !sms.isStarred)
+        }
     }
 
     fun openConversation(key: String) {

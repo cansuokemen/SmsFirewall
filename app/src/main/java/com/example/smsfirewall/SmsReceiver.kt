@@ -136,6 +136,7 @@ class SmsReceiver : BroadcastReceiver() {
 
         val openAppIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(NotificationConstants.EXTRA_OPEN_SENDER, sender)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,

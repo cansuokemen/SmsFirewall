@@ -31,9 +31,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.launch
+import com.example.smsfirewall.notifications.NotificationConstants
 import com.example.smsfirewall.ui.inbox.BlockedSmsScreen
 import com.example.smsfirewall.ui.inbox.AppLockScreen
 import com.example.smsfirewall.ui.inbox.InboxViewModel
+import com.example.smsfirewall.util.normalizeSender
 import com.example.smsfirewall.ui.theme.ThemePreferenceStore
 import com.example.smsfirewall.ui.theme.ThemeMode
 import com.example.smsfirewall.ui.theme.SmsFirewallTheme
@@ -47,6 +49,7 @@ class MainActivity : FragmentActivity() {
     private var uiStarted = false
     private var requestInFlight = false
     private var requestAttempted = false
+    private var pendingOpenSender: String? = null
 
     private val inboxViewModel: InboxViewModel by viewModels()
 
@@ -71,7 +74,23 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        extractOpenSenderExtra(intent)
         continueOnlyIfDefaultSms()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        extractOpenSenderExtra(intent)
+        pendingOpenSender?.let { sender ->
+            inboxViewModel.openConversation(normalizeSender(sender))
+            pendingOpenSender = null
+        }
+    }
+
+    private fun extractOpenSenderExtra(intent: Intent?) {
+        intent?.getStringExtra(NotificationConstants.EXTRA_OPEN_SENDER)?.let { sender ->
+            pendingOpenSender = sender
+        }
     }
 
     override fun onResume() {
@@ -169,6 +188,10 @@ class MainActivity : FragmentActivity() {
             LaunchedEffect(Unit) {
                 launch { launchScale.animateTo(1f, animationSpec = tween(durationMillis = 460)) }
                 launch { launchAlpha.animateTo(1f, animationSpec = tween(durationMillis = 380)) }
+                pendingOpenSender?.let { sender ->
+                    inboxViewModel.openConversation(normalizeSender(sender))
+                    pendingOpenSender = null
+                }
             }
             SmsFirewallTheme(themeMode = themeMode) {
                 Surface(

@@ -51,6 +51,10 @@ class SmsRepository @Inject constructor(
         if (ids.isNotEmpty()) smsDao.deleteByIds(ids)
     }
 
+    suspend fun setMessageStarred(id: Long, starred: Boolean) {
+        smsDao.setStarred(id, starred)
+    }
+
     suspend fun migratePlaintextSensitiveRows() {
         smsDao.getAllByStatuses(SENSITIVE_STATUSES)
             .filterNot { it.isStoredEncrypted() }

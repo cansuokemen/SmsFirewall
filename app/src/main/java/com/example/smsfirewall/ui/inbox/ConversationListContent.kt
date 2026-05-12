@@ -77,6 +77,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -523,10 +524,16 @@ private fun SelectionModeHeader(
                 fontWeight = FontWeight.Bold,
                 modifier   = Modifier.weight(1f)
             )
-            IconButton(onClick = onToggleSelectAll) {
+            TextButton(onClick = onToggleSelectAll) {
                 Icon(
                     imageVector = if (allSelected) Icons.Outlined.Deselect else Icons.Outlined.SelectAll,
-                    contentDescription = stringResource(if (allSelected) R.string.deselect_all else R.string.select_all)
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text  = stringResource(if (allSelected) R.string.deselect_all else R.string.select_all),
+                    style = MaterialTheme.typography.labelMedium
                 )
             }
         }
