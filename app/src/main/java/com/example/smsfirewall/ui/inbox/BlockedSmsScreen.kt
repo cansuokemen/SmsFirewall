@@ -50,6 +50,12 @@ fun BlockedSmsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val messageMovedText = stringResource(R.string.message_moved)
+    val messageMoveFailedText = stringResource(R.string.message_move_failed)
+    val messageSendFailedText = stringResource(R.string.message_send_failed)
+    val messageSentText = stringResource(R.string.message_sent)
+    val messageCopiedText = stringResource(R.string.message_copied)
+    val senderBlockedText = stringResource(R.string.sender_blocked)
 
     val systemResult by viewModel.systemMessages.collectAsState()
     val regularMessages = systemResult.messages
@@ -86,6 +92,19 @@ fun BlockedSmsScreen(
         emptySet()
     }
     val unknownSenderLabel = stringResource(R.string.unknown_sender)
+
+    val regularConversationsForCounts = remember(filteredRegularMessages, unreadIds, unknownSenderLabel, viewModel.conversationMetaToken) {
+        buildConversations(filteredRegularMessages, unreadIds, unknownSenderLabel, viewModel.conversationMetaStore)
+    }
+    val spamConversationsForCount = remember(filteredSpamMessages, unknownSenderLabel) {
+        buildConversations(filteredSpamMessages, emptySet(), unknownSenderLabel, viewModel.conversationMetaStore)
+    }
+    val trashConversationsForCount = remember(trashMessages, unknownSenderLabel) {
+        buildConversations(trashMessages, emptySet(), unknownSenderLabel, viewModel.conversationMetaStore)
+    }
+    val archivedConversationCount = remember(regularConversationsForCounts) {
+        regularConversationsForCounts.count { it.isArchived }
+    }
 
     val allConversations = remember(visibleMessages, currentUnreadIds, unknownSenderLabel, viewModel.conversationMetaToken) {
         buildConversations(visibleMessages, currentUnreadIds, unknownSenderLabel, viewModel.conversationMetaStore)
@@ -224,6 +243,8 @@ fun BlockedSmsScreen(
                                 canSendMessage    = viewModel.selectedTab == InboxTab.MESSAGES || viewModel.selectedTab == InboxTab.ARCHIVE,
                                 isSpamConversation = viewModel.selectedTab == InboxTab.SPAM,
                                 backgroundSpec     = viewModel.backgroundFor(conv.displaySender),
+                                textSize           = viewModel.appTextSize,
+                                bubbleStyle        = viewModel.bubbleStyle,
                                 onChangeBackground = {
                                     backgroundSheetTarget = BackgroundSheetTarget.Conversation(conv.displaySender)
                                 },
@@ -236,14 +257,14 @@ fun BlockedSmsScreen(
                                     onSpamMessageClick = { sms -> viewModel.openedSpamMessage = sms },
                                     onMarkAsNotSpam   = { sms ->
                                         viewModel.markAsNotSpam(sms) { moved ->
-                                            val msgRes = if (moved) R.string.message_moved else R.string.message_move_failed
-                                            Toast.makeText(context, context.getString(msgRes), Toast.LENGTH_SHORT).show()
+                                            val message = if (moved) messageMovedText else messageMoveFailedText
+                                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                                         }
                                     },
                                     onDeleteSpam  = { sms -> viewModel.deleteSpam(sms) },
                                     onSendMessage = { messageBody ->
                                         viewModel.sendAndStoreMessage(conv.displaySender, messageBody) { sent ->
-                                            if (!sent) Toast.makeText(context, context.getString(R.string.message_send_failed), Toast.LENGTH_SHORT).show()
+                                            if (!sent) Toast.makeText(context, messageSendFailedText, Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 )
@@ -259,11 +280,11 @@ fun BlockedSmsScreen(
                             onSendMessage = { destinationAddress, messageBody ->
                                 viewModel.sendAndStoreMessage(destinationAddress, messageBody) { sent ->
                                     if (sent) {
-                                        Toast.makeText(context, context.getString(R.string.message_sent), Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, messageSentText, Toast.LENGTH_SHORT).show()
                                         viewModel.closeNewMessage()
                                         viewModel.selectTab(InboxTab.MESSAGES)
                                     } else {
-                                        Toast.makeText(context, context.getString(R.string.message_send_failed), Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, messageSendFailedText, Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             }
@@ -294,6 +315,26 @@ fun BlockedSmsScreen(
                             mainBackground          = viewModel.mainBackground,
                             onChangeMainBackground  = { backgroundSheetTarget = BackgroundSheetTarget.Main },
                             onResetMainBackground   = { viewModel.resetMainBackground() },
+                            appLockEnabled         = viewModel.isAppLockEnabled,
+                            pinConfigured          = viewModel.isPinConfigured,
+                            biometricLockEnabled   = viewModel.isBiometricLockEnabled,
+                            onSetAppLockPin        = { viewModel.setAppLockPin(it) },
+                            onClearAppLock         = { viewModel.clearAppLock() },
+                            onBiometricLockChanged = { viewModel.updateBiometricLockEnabled(it) },
+                            trashRetentionDays     = viewModel.trashRetentionDays,
+                            onTrashRetentionChanged = { viewModel.updateTrashRetention(it) },
+                            privateAreaEncryptionEnabled = viewModel.privateAreaEncryptionEnabled,
+                            onPrivateAreaEncryptionChanged = { viewModel.updatePrivateAreaEncryption(it) },
+                            trashCount             = trashMessages.size,
+                            spamCount              = filteredSpamMessages.size,
+                            onEmptyTrash           = { onDone -> viewModel.emptyTrash(onDone) },
+                            onEmptySpam            = { onDone -> viewModel.emptySpam(onDone) },
+                            listDensity            = viewModel.listDensity,
+                            onListDensityChanged   = { viewModel.updateListDensity(it) },
+                            appTextSize            = viewModel.appTextSize,
+                            onAppTextSizeChanged   = { viewModel.updateAppTextSize(it) },
+                            bubbleStyle            = viewModel.bubbleStyle,
+                            onBubbleStyleChanged   = { viewModel.updateBubbleStyle(it) },
                             onBack                  = { viewModel.closeSettings() },
                             modifier                = Modifier.fillMaxSize()
                         )
@@ -327,7 +368,10 @@ fun BlockedSmsScreen(
                             isBottomBarVisible    = isBottomBarVisible,
                             messagesUnreadCount   = msgUnreadCount,
                             messagesFavoriteCount = msgFavoriteCount,
-                            archivedCount         = archivedConversations.size,
+                            archivedCount         = archivedConversationCount,
+                            messagesCount         = 0,
+                            spamCount             = spamConversationsForCount.size,
+                            trashCount            = trashConversationsForCount.size,
                             onOpenArchive         = { viewModel.selectTab(InboxTab.ARCHIVE) }
                         )
                     }
@@ -342,7 +386,7 @@ fun BlockedSmsScreen(
             onCopy    = { sms ->
                 val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                 cm.setPrimaryClip(android.content.ClipData.newPlainText("SMS", sms.body))
-                Toast.makeText(context, context.getString(R.string.message_copied), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, messageCopiedText, Toast.LENGTH_SHORT).show()
                 viewModel.selectedForDelete = null
             },
             onDelete      = { sms ->
@@ -390,7 +434,7 @@ fun BlockedSmsScreen(
                 viewModel.showBlockConfirm    = false
                 viewModel.pendingBlockSenders = emptyList()
                 viewModel.exitSelectionMode()
-                Toast.makeText(context, context.getString(R.string.sender_blocked), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, senderBlockedText, Toast.LENGTH_SHORT).show()
             },
             onDismiss = {
                 viewModel.showBlockConfirm    = false

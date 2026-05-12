@@ -4,6 +4,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,6 +69,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.smsfirewall.data.AppTextSize
+import com.example.smsfirewall.data.ListDensity
 import com.example.smsfirewall.R
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -75,12 +79,21 @@ internal fun ConversationListItem(
     conversation: SmsConversation,
     contactName: String?,
     state: ConversationItemState,
+    listDensity: ListDensity,
+    textSize: AppTextSize,
     callbacks: ConversationItemCallbacks,
     modifier: Modifier = Modifier
 ) {
     val currentState by rememberUpdatedState(state)
     val currentCallbacks by rememberUpdatedState(callbacks)
     val haptic = LocalHapticFeedback.current
+    val cardInteractionSource = remember { MutableInteractionSource() }
+    val isCardPressed by cardInteractionSource.collectIsPressedAsState()
+    val cardScale by animateFloatAsState(
+        targetValue = if (isCardPressed) 0.985f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "conversationCardScale"
+    )
 
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -107,6 +120,7 @@ internal fun ConversationListItem(
     val avatarLetter  = displayName.firstOrNull()?.uppercase() ?: "?"
     val avatarColor   = avatarColorForSender(conversation.displaySender)
     val hasUnread     = conversation.unreadCount > 0
+    val bodyScale = textSize.bodyScale()
 
     val actionsAlpha by animateFloatAsState(
         targetValue   = if (state.isActionsVisible) 1f else 0f,
@@ -116,8 +130,9 @@ internal fun ConversationListItem(
 
     val cardBgColor by animateColorAsState(
         targetValue = when {
-            state.isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
-            else             -> MaterialTheme.colorScheme.surface.copy(alpha = 0.84f)
+            state.isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+            hasUnread        -> MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f)
+            else             -> MaterialTheme.colorScheme.surface.copy(alpha = 0.66f)
         },
         animationSpec = tween(durationMillis = 200),
         label = "cardBg"
@@ -168,13 +183,19 @@ internal fun ConversationListItem(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .graphicsLayer {
+                        scaleX = cardScale
+                        scaleY = cardScale
+                    }
                     .then(
                         if (hasUnread && !state.isSelected)
-                            Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
+                            Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f), RoundedCornerShape(16.dp))
                         else
                             Modifier
                     )
                     .combinedClickable(
+                        interactionSource = cardInteractionSource,
+                        indication = null,
                         onClick = {
                             if (state.isActionsVisible) callbacks.onHideActions()
                             else callbacks.onOpenConversation()
@@ -184,12 +205,12 @@ internal fun ConversationListItem(
                             callbacks.onLongClick()
                         }
                     ),
-                shape  = RoundedCornerShape(20.dp),
+                shape  = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = cardBgColor),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = listDensity.itemVerticalPadding()),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -220,14 +241,14 @@ internal fun ConversationListItem(
                     // Gradient avatar
                     Box(
                         modifier = Modifier
-                            .size(50.dp)
+                            .size(46.dp)
                             .clip(CircleShape)
                             .background(avatarBrush),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text  = avatarLetter,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             color = Color.White,
                             fontWeight = FontWeight.Bold
                         )
@@ -260,7 +281,9 @@ internal fun ConversationListItem(
                                     }
                                     Text(
                                         text       = displayName,
-                                        style      = MaterialTheme.typography.titleSmall,
+                                        style      = MaterialTheme.typography.bodyLarge.copy(
+                                            fontSize = MaterialTheme.typography.bodyLarge.fontSize * bodyScale
+                                        ),
                                         fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.SemiBold,
                                         color      = MaterialTheme.colorScheme.onSurface,
                                         maxLines   = 1,
@@ -281,9 +304,11 @@ internal fun ConversationListItem(
                                 if (latestMessage != null) {
                                     Text(
                                         text       = latestMessage.body.ifBlank { stringResource(R.string.empty_message_placeholder) },
-                                        style      = MaterialTheme.typography.bodyMedium,
+                                        style      = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = MaterialTheme.typography.bodyMedium.fontSize * bodyScale
+                                        ),
                                         color      = if (hasUnread) MaterialTheme.colorScheme.onSurface
-                                                     else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.86f),
                                         fontWeight = if (hasUnread) FontWeight.Medium else FontWeight.Normal,
                                         maxLines   = if (state.showReason) 1 else 2,
                                         overflow   = TextOverflow.Ellipsis,

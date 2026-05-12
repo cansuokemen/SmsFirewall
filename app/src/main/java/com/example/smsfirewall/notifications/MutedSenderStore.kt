@@ -2,9 +2,13 @@ package com.example.smsfirewall.notifications
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.smsfirewall.data.security.CryptoBox
 import com.example.smsfirewall.util.normalizeSender
 
-class MutedSenderStore(context: Context) {
+class MutedSenderStore(
+    context: Context,
+    private val cryptoBox: CryptoBox
+) {
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
@@ -17,7 +21,7 @@ class MutedSenderStore(context: Context) {
             current.add(normalized)
         }
 
-        prefs.edit().putStringSet(KEY_MUTED_SENDERS, current).apply()
+        putMutedSenders(current)
     }
 
     fun isMuted(sender: String): Boolean {
@@ -33,12 +37,26 @@ class MutedSenderStore(context: Context) {
 
         val current = getMutedSenders().toMutableSet()
         if (current.removeAll { normalizeSender(it) == normalized }) {
-            prefs.edit().putStringSet(KEY_MUTED_SENDERS, current).apply()
+            putMutedSenders(current)
         }
     }
 
     private fun getMutedSenders(): Set<String> {
-        return prefs.getStringSet(KEY_MUTED_SENDERS, emptySet()).orEmpty()
+        return when (val raw = prefs.all[KEY_MUTED_SENDERS]) {
+            is String -> cryptoBox.decrypt(raw)
+                .lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .toSet()
+            is Set<*> -> raw.filterIsInstance<String>().toSet().also { putMutedSenders(it) }
+            else -> emptySet()
+        }
+    }
+
+    private fun putMutedSenders(values: Set<String>) {
+        prefs.edit()
+            .putString(KEY_MUTED_SENDERS, cryptoBox.encrypt(values.sorted().joinToString(separator = "\n")))
+            .apply()
     }
 
     private companion object {

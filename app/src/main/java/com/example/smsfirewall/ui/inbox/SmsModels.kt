@@ -1,7 +1,11 @@
 package com.example.smsfirewall.ui.inbox
 
 import com.example.smsfirewall.R
+import com.example.smsfirewall.data.AppTextSize
+import com.example.smsfirewall.data.BubbleStyle
+import com.example.smsfirewall.data.ListDensity
 import com.example.smsfirewall.data.local.SmsEntity
+import androidx.compose.ui.unit.dp
 
 internal const val SENT_MESSAGE_REASON = "Sent by user"
 internal const val SYSTEM_PROVIDER_REASON = "From system provider"
@@ -67,3 +71,16 @@ data class DetailScreenCallbacks(
     val onDeleteSpam: (SmsEntity) -> Unit = {},
     val onSendMessage: (String) -> Unit = {}
 )
+
+internal fun AppTextSize.bodyScale(): Float = when (this) {
+    AppTextSize.SMALL -> 0.92f
+    AppTextSize.NORMAL -> 1f
+    AppTextSize.LARGE -> 1.12f
+}
+
+internal fun ListDensity.itemVerticalPadding(): androidx.compose.ui.unit.Dp = when (this) {
+    ListDensity.COMFORTABLE -> 10.dp
+    ListDensity.COMPACT -> 7.dp
+}
+
+internal fun BubbleStyle.isSoft(): Boolean = this == BubbleStyle.SOFT

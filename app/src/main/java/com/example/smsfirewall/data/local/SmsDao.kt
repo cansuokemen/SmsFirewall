@@ -24,8 +24,20 @@ interface SmsDao {
     @Query("DELETE FROM sms_messages WHERE status = :status AND receivedAt < :beforeTimestamp")
     suspend fun deleteByStatusBefore(status: String, beforeTimestamp: Long): Int
 
+    @Query("DELETE FROM sms_messages WHERE status = :status")
+    suspend fun deleteAllByStatus(status: String): Int
+
     @Query("SELECT * FROM sms_messages WHERE status = :status")
     suspend fun getAllByStatus(status: String): List<SmsEntity>
+
+    @Query("SELECT * FROM sms_messages WHERE status IN (:statuses)")
+    suspend fun getAllByStatuses(statuses: List<String>): List<SmsEntity>
+
+    @Query("DELETE FROM sms_messages WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM sms_messages WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
 
     @Delete
     suspend fun delete(sms: SmsEntity)

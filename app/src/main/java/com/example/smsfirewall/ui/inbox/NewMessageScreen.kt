@@ -16,8 +16,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -72,6 +74,11 @@ internal fun NewMessageScreen(
     var destinationAddress by remember { mutableStateOf("") }
     var draftMessage by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val contactPickFailedText = stringResource(R.string.contact_pick_failed)
+    val numberNotFoundText = stringResource(R.string.number_not_found)
+    val enterNumberText = stringResource(R.string.enter_number)
+    val messageEmptyText = stringResource(R.string.message_empty)
+    val contactsOpenFailedText = stringResource(R.string.contacts_open_failed)
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val haptic = LocalHapticFeedback.current
@@ -92,7 +99,7 @@ internal fun NewMessageScreen(
 
         val contactUri = result.data?.data
         if (contactUri == null) {
-            Toast.makeText(context, context.getString(R.string.contact_pick_failed), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, contactPickFailedText, Toast.LENGTH_SHORT).show()
             return@rememberLauncherForActivityResult
         }
 
@@ -102,7 +109,7 @@ internal fun NewMessageScreen(
                 contactUri = contactUri
             )
             if (selectedNumber.isNullOrBlank()) {
-                Toast.makeText(context, context.getString(R.string.number_not_found), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, numberNotFoundText, Toast.LENGTH_SHORT).show()
             } else {
                 destinationAddress = selectedNumber
             }
@@ -114,11 +121,11 @@ internal fun NewMessageScreen(
         val messageBody = draftMessage.trim()
 
         if (recipient.isBlank()) {
-            Toast.makeText(context, context.getString(R.string.enter_number), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, enterNumberText, Toast.LENGTH_SHORT).show()
             return
         }
         if (messageBody.isBlank()) {
-            Toast.makeText(context, context.getString(R.string.message_empty), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, messageEmptyText, Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -144,6 +151,8 @@ internal fun NewMessageScreen(
                 keyboardController?.hide()
             }
             .imePadding()
+            .navigationBarsPadding()
+            .statusBarsPadding()
     ) {
         TopAppBar(
             title = {
@@ -201,7 +210,7 @@ internal fun NewMessageScreen(
                         contactPickerLauncher.launch(pickContactIntent)
                     }.onFailure { throwable ->
                         Log.e(TAG, "Failed to open contact picker", throwable)
-                        Toast.makeText(context, context.getString(R.string.contacts_open_failed), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, contactsOpenFailedText, Toast.LENGTH_SHORT).show()
                     }
                 },
                 modifier = Modifier.size(56.dp),

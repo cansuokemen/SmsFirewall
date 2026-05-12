@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
@@ -41,6 +42,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
+import com.example.smsfirewall.data.AppTextSize
+import com.example.smsfirewall.data.BubbleStyle
 import com.example.smsfirewall.data.local.SmsEntity
 
 private val OutgoingBubbleShape = RoundedCornerShape(
@@ -56,14 +59,18 @@ private val RightOrigin = TransformOrigin(1f, 1f)
 @Composable
 internal fun DetailMessageBubble(
     sms: SmsEntity,
+    textSize: AppTextSize,
+    bubbleStyle: BubbleStyle,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
-    onLongPress: () -> Unit,
-    modifier: Modifier = Modifier
+    onLongPress: () -> Unit
 ) {
     val isOutgoing = sms.reason == SENT_MESSAGE_REASON
-    val bubbleShape = if (isOutgoing) OutgoingBubbleShape else IncomingBubbleShape
+    val bubbleShape = if (bubbleStyle.isSoft()) RoundedCornerShape(22.dp)
+    else if (isOutgoing) OutgoingBubbleShape else IncomingBubbleShape
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
+    val bodyScale = textSize.bodyScale()
 
     val scaleAnim       = remember(sms.id) { Animatable(0.85f) }
     val translateXAnim  = remember(sms.id) { Animatable(if (isOutgoing) 60f else -40f) }
@@ -132,7 +139,9 @@ internal fun DetailMessageBubble(
         ) {
             Text(
                 text  = sms.body.ifBlank { stringResource(R.string.empty_message_placeholder) },
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = MaterialTheme.typography.bodyMedium.fontSize * bodyScale
+                ),
                 color = if (isOutgoing) MaterialTheme.colorScheme.onPrimary
                         else MaterialTheme.colorScheme.onSurface
             )
@@ -242,6 +251,8 @@ internal fun SwipeActionButton(
     IconButton(
         modifier = Modifier
             .size(44.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
             .graphicsLayer {
                 scaleX = scale.value
                 scaleY = scale.value

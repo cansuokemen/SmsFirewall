@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.lazy.LazyColumn
@@ -81,6 +83,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
+import com.example.smsfirewall.data.AppTextSize
+import com.example.smsfirewall.data.BubbleStyle
 import com.example.smsfirewall.data.background.BackgroundSpec
 import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.ui.background.AppBackground
@@ -93,6 +97,8 @@ internal fun ConversationDetailScreen(
     canSendMessage: Boolean,
     isSpamConversation: Boolean,
     backgroundSpec: BackgroundSpec,
+    textSize: AppTextSize,
+    bubbleStyle: BubbleStyle,
     onChangeBackground: () -> Unit,
     onResetBackground: () -> Unit,
     callbacks: DetailScreenCallbacks
@@ -194,7 +200,11 @@ internal fun ConversationDetailScreen(
             .fillMaxSize()
             .swipeBackGesture(onBack = handleBack)
     ) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+    ) {
         TopAppBar(
             title = {
                 Row(
@@ -277,7 +287,7 @@ internal fun ConversationDetailScreen(
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)
             )
         )
 
@@ -299,6 +309,8 @@ internal fun ConversationDetailScreen(
                     DetailMessageBubble(
                         modifier  = Modifier.animateItem(),
                         sms       = sms,
+                        textSize  = textSize,
+                        bubbleStyle = bubbleStyle,
                         onClick   = {
                             focusManager.clearFocus()
                             keyboardController?.hide()
@@ -359,9 +371,10 @@ internal fun ConversationDetailScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.72f))
+                    .navigationBarsPadding()
                     .imePadding()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -383,8 +396,8 @@ internal fun ConversationDetailScreen(
                     singleLine  = true,
                     shape       = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor   = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedContainerColor   = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.74f),
                         focusedBorderColor      = inputBorderColor,
                         unfocusedBorderColor    = inputBorderColor
                     ),

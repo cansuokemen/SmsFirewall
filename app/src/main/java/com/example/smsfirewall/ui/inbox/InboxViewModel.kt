@@ -17,7 +17,12 @@ import androidx.compose.runtime.setValue
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.smsfirewall.data.AppearancePreferenceStore
+import com.example.smsfirewall.data.AppTextSize
+import com.example.smsfirewall.data.BubbleStyle
 import com.example.smsfirewall.data.ConversationMetaStore
+import com.example.smsfirewall.data.ListDensity
+import com.example.smsfirewall.data.PrivacyPreferenceStore
 import com.example.smsfirewall.data.SpamRetentionPreferenceStore
 import com.example.smsfirewall.data.SmsRepository
 import com.example.smsfirewall.data.background.BackgroundImageRepository
@@ -40,6 +45,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import com.example.smsfirewall.data.AppLockPreferenceStore
 
 enum class ScreenState {
     LIST, DETAIL, NEW_MESSAGE, SETTINGS, ARCHIVE
@@ -57,6 +63,9 @@ class InboxViewModel @Inject constructor(
     val conversationMetaStore: ConversationMetaStore,
     val filterKeywordStore: FilterKeywordStore,
     val spamRetentionStore: SpamRetentionPreferenceStore,
+    val appLockPreferenceStore: AppLockPreferenceStore,
+    val privacyPreferenceStore: PrivacyPreferenceStore,
+    val appearancePreferenceStore: AppearancePreferenceStore,
     val notificationPreferenceStore: NotificationPreferenceStore,
     val backgroundPreferenceStore: BackgroundPreferenceStore,
     val backgroundImageRepository: BackgroundImageRepository
@@ -183,6 +192,102 @@ class InboxViewModel @Inject constructor(
     fun setSpamRetention(days: Int) {
         spamRetentionStore.setRetentionDays(days)
         spamRetentionDays = days
+    }
+
+    // --- Gorunum tercihleri ---
+    var listDensity by mutableStateOf(appearancePreferenceStore.getListDensity())
+        private set
+
+    var appTextSize by mutableStateOf(appearancePreferenceStore.getTextSize())
+        private set
+
+    var bubbleStyle by mutableStateOf(appearancePreferenceStore.getBubbleStyle())
+        private set
+
+    fun updateListDensity(value: ListDensity) {
+        appearancePreferenceStore.setListDensity(value)
+        listDensity = value
+    }
+
+    fun updateAppTextSize(value: AppTextSize) {
+        appearancePreferenceStore.setTextSize(value)
+        appTextSize = value
+    }
+
+    fun updateBubbleStyle(value: BubbleStyle) {
+        appearancePreferenceStore.setBubbleStyle(value)
+        bubbleStyle = value
+    }
+
+    // --- Guvenlik tercihleri ---
+    var isAppLockEnabled by mutableStateOf(appLockPreferenceStore.isLockEnabled())
+        private set
+
+    var isPinConfigured by mutableStateOf(appLockPreferenceStore.hasPin())
+        private set
+
+    var isBiometricLockEnabled by mutableStateOf(appLockPreferenceStore.isBiometricEnabled())
+        private set
+
+    fun setAppLockPin(pin: String) {
+        appLockPreferenceStore.setPin(pin)
+        isPinConfigured = true
+        isAppLockEnabled = true
+        isBiometricLockEnabled = appLockPreferenceStore.isBiometricEnabled()
+    }
+
+    fun clearAppLock() {
+        appLockPreferenceStore.clearLock()
+        isPinConfigured = false
+        isAppLockEnabled = false
+        isBiometricLockEnabled = false
+    }
+
+    fun updateBiometricLockEnabled(enabled: Boolean) {
+        appLockPreferenceStore.setBiometricEnabled(enabled)
+        isBiometricLockEnabled = appLockPreferenceStore.isBiometricEnabled()
+    }
+
+    // --- Gizlilik / veri tercihleri ---
+    var trashRetentionDays by mutableStateOf(privacyPreferenceStore.getTrashRetentionDays())
+        private set
+
+    var privateAreaEncryptionEnabled by mutableStateOf(privacyPreferenceStore.isPrivateAreaEncryptionEnabled())
+        private set
+
+    fun updateTrashRetention(days: Int) {
+        privacyPreferenceStore.setTrashRetentionDays(days)
+        trashRetentionDays = days
+        cleanupExpiredTrash()
+    }
+
+    fun updatePrivateAreaEncryption(enabled: Boolean) {
+        privacyPreferenceStore.setPrivateAreaEncryptionEnabled(enabled)
+        privateAreaEncryptionEnabled = enabled
+    }
+
+    fun cleanupExpiredTrash() {
+        if (privacyPreferenceStore.getTrashRetentionDays() == PrivacyPreferenceStore.RETENTION_NEVER) return
+        viewModelScope.launch {
+            repository.deleteByStatusBefore(
+                status = SmsStatus.TRASH,
+                beforeTimestamp = privacyPreferenceStore.trashCutoffTimestamp()
+            )
+        }
+    }
+
+    fun emptyTrash(onComplete: (Int) -> Unit = {}) {
+        viewModelScope.launch {
+            val deleted = repository.deleteAllByStatus(SmsStatus.TRASH)
+            onComplete(deleted)
+        }
+    }
+
+    fun emptySpam(onComplete: (Int) -> Unit = {}) {
+        viewModelScope.launch {
+            val deleted = repository.deleteAllByStatus(SmsStatus.BLOCK)
+            onComplete(deleted)
+        }
     }
 
     // --- Bildirim tercihleri ---
@@ -345,10 +450,12 @@ class InboxViewModel @Inject constructor(
         )
         refreshSystemMessages()
         viewModelScope.launch {
+            repository.migratePlaintextSensitiveRows()
             repository.deleteByStatusBefore(
                 status = SmsStatus.BLOCK,
                 beforeTimestamp = spamRetentionStore.cutoffTimestamp()
             )
+            cleanupExpiredTrash()
         }
     }
 
