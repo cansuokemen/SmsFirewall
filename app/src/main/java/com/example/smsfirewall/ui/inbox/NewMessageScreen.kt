@@ -16,8 +16,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -38,6 +40,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,8 +50,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -67,9 +74,22 @@ internal fun NewMessageScreen(
     var destinationAddress by remember { mutableStateOf("") }
     var draftMessage by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val contactPickFailedText = stringResource(R.string.contact_pick_failed)
+    val numberNotFoundText = stringResource(R.string.number_not_found)
+    val enterNumberText = stringResource(R.string.enter_number)
+    val messageEmptyText = stringResource(R.string.message_empty)
+    val contactsOpenFailedText = stringResource(R.string.contacts_open_failed)
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
+
+    val isReadyToSend = destinationAddress.isNotBlank() && draftMessage.isNotBlank()
+    val sendButtonScale by animateFloatAsState(
+        targetValue   = if (isReadyToSend) 1f else 0.88f,
+        animationSpec = tween(200),
+        label         = "sendScale"
+    )
     val contactPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -79,7 +99,7 @@ internal fun NewMessageScreen(
 
         val contactUri = result.data?.data
         if (contactUri == null) {
-            Toast.makeText(context, context.getString(R.string.contact_pick_failed), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, contactPickFailedText, Toast.LENGTH_SHORT).show()
             return@rememberLauncherForActivityResult
         }
 
@@ -89,7 +109,7 @@ internal fun NewMessageScreen(
                 contactUri = contactUri
             )
             if (selectedNumber.isNullOrBlank()) {
-                Toast.makeText(context, context.getString(R.string.number_not_found), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, numberNotFoundText, Toast.LENGTH_SHORT).show()
             } else {
                 destinationAddress = selectedNumber
             }
@@ -101,11 +121,11 @@ internal fun NewMessageScreen(
         val messageBody = draftMessage.trim()
 
         if (recipient.isBlank()) {
-            Toast.makeText(context, context.getString(R.string.enter_number), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, enterNumberText, Toast.LENGTH_SHORT).show()
             return
         }
         if (messageBody.isBlank()) {
-            Toast.makeText(context, context.getString(R.string.message_empty), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, messageEmptyText, Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -131,6 +151,8 @@ internal fun NewMessageScreen(
                 keyboardController?.hide()
             }
             .imePadding()
+            .navigationBarsPadding()
+            .statusBarsPadding()
     ) {
         TopAppBar(
             title = {
@@ -177,6 +199,7 @@ internal fun NewMessageScreen(
             )
             FloatingActionButton(
                 onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     focusManager.clearFocus()
                     keyboardController?.hide()
                     val pickContactIntent = Intent(
@@ -187,7 +210,7 @@ internal fun NewMessageScreen(
                         contactPickerLauncher.launch(pickContactIntent)
                     }.onFailure { throwable ->
                         Log.e(TAG, "Failed to open contact picker", throwable)
-                        Toast.makeText(context, context.getString(R.string.contacts_open_failed), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, contactsOpenFailedText, Toast.LENGTH_SHORT).show()
                     }
                 },
                 modifier = Modifier.size(56.dp),
@@ -233,11 +256,12 @@ internal fun NewMessageScreen(
         ) {
             FilledIconButton(
                 onClick = {
+                    if (isReadyToSend) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     submitMessage()
                     keyboardController?.hide()
                 },
-                enabled = destinationAddress.isNotBlank() && draftMessage.isNotBlank(),
-                modifier = Modifier.size(48.dp),
+                enabled = isReadyToSend,
+                modifier = Modifier.size(48.dp).scale(sendButtonScale),
                 shape = CircleShape,
                 colors = IconButtonDefaults.filledIconButtonColors(
                     containerColor = MaterialTheme.colorScheme.primary,

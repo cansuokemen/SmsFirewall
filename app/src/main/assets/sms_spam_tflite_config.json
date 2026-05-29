@@ -1,0 +1,19 @@
+{
+  "max_len": 128,
+  "pad_token": "<PAD>",
+  "unk_token": "<UNK>",
+  "pad_id": 0,
+  "unk_id": 1,
+  "labels": {
+    "0": "ham",
+    "1": "spam"
+  },
+  "threshold": 0.5,
+  "preprocess": {
+    "lowercase": true,
+    "replace_urls_with": "URL",
+    "replace_numbers_with": "NUMBER",
+    "remove_ascii_punctuation": true,
+    "split": "whitespace"
+  }
+}

@@ -1,8 +1,6 @@
 package com.example.smsfirewall
 
 import android.Manifest
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.ContentValues
@@ -21,6 +19,7 @@ import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.FilterKeywordStore
 import com.example.smsfirewall.filter.SmsFilterEngine
 import com.example.smsfirewall.filter.SmsStatus
+import com.example.smsfirewall.filter.SpamClassifier
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationConstants
 import com.example.smsfirewall.notifications.NotificationPreferenceStore
@@ -39,6 +38,7 @@ class SmsReceiver : BroadcastReceiver() {
     @Inject lateinit var mutedSenderStore: MutedSenderStore
     @Inject lateinit var spamRetentionStore: SpamRetentionPreferenceStore
     @Inject lateinit var notificationPreferenceStore: NotificationPreferenceStore
+    @Inject lateinit var spamClassifier: SpamClassifier
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
@@ -56,8 +56,9 @@ class SmsReceiver : BroadcastReceiver() {
         val receivedAt = messages.firstOrNull()?.timestampMillis ?: System.currentTimeMillis()
 
         val filterEngine = SmsFilterEngine(
-            blockedSenders = filterKeywordStore.getBlockedSenders(),
-            blockedKeywords = filterKeywordStore.getBlockedKeywords()
+            blockedSenders  = filterKeywordStore.getBlockedSenders(),
+            blockedKeywords = filterKeywordStore.getBlockedKeywords(),
+            classifier      = spamClassifier
         )
         val decision = filterEngine.evaluate(sender = sender, body = body)
 
@@ -133,23 +134,9 @@ class SmsReceiver : BroadcastReceiver() {
             return
         }
 
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                NotificationConstants.ALLOWED_SMS_CHANNEL_ID,
-                context.getString(R.string.notification_channel_name),
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                enableVibration(notificationPreferenceStore.isVibrationEnabled())
-                if (!notificationPreferenceStore.isSoundEnabled()) {
-                    setSound(null, null)
-                }
-            }
-            manager.createNotificationChannel(channel)
-        }
-
         val openAppIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(NotificationConstants.EXTRA_OPEN_SENDER, sender)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -160,6 +147,7 @@ class SmsReceiver : BroadcastReceiver() {
 
         val soundEnabled = notificationPreferenceStore.isSoundEnabled()
         val vibrationEnabled = notificationPreferenceStore.isVibrationEnabled()
+        val customSoundUri = notificationPreferenceStore.getSoundUri()
 
         val builder = NotificationCompat.Builder(context, NotificationConstants.ALLOWED_SMS_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_email)
@@ -181,11 +169,21 @@ class SmsReceiver : BroadcastReceiver() {
             builder.setSound(null)
         } else if (!vibrationEnabled) {
             builder.setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            builder.setDefaults(NotificationCompat.DEFAULT_SOUND)
+            if (customSoundUri != null) {
+                builder.setDefaults(0)
+                builder.setSound(customSoundUri)
+            } else {
+                builder.setDefaults(NotificationCompat.DEFAULT_SOUND)
+            }
             builder.setVibrate(null)
         } else {
             builder.setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            builder.setDefaults(NotificationCompat.DEFAULT_ALL)
+            if (customSoundUri != null) {
+                builder.setDefaults(NotificationCompat.DEFAULT_VIBRATE)
+                builder.setSound(customSoundUri)
+            } else {
+                builder.setDefaults(NotificationCompat.DEFAULT_ALL)
+            }
         }
 
         NotificationManagerCompat.from(context).notify(System.currentTimeMillis().toInt(), builder.build())

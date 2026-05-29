@@ -4,6 +4,37 @@
     <!-- Tabs -->
     <string name="tab_messages">Mesajlar</string>
     <string name="tab_spam">Spam</string>
+    <string name="tab_archive">Arşiv</string>
+    <string name="tab_trash">Çöp</string>
+
+    <!-- Filters -->
+    <string name="filter_all">Tümü</string>
+    <string name="filter_unread">Okunmamış</string>
+    <string name="filter_favorites">Favoriler</string>
+
+    <!-- Stats -->
+    <string name="stats_total">Toplam</string>
+    <string name="stats_unread">Okunmamış</string>
+    <string name="stats_favorites">Favori</string>
+    <string name="stats_spam">Spam</string>
+
+    <!-- Selection actions -->
+    <string name="action_pin">Sabitle</string>
+    <string name="action_favorite">Favoriye Ekle</string>
+    <string name="action_mute">Sessize Al</string>
+    <string name="action_archive">Arşivle</string>
+    <string name="action_unarchive">Arşivden Çıkar</string>
+    <string name="archived_conversations">Arşivlenenler</string>
+    <string name="archive_empty_title">Arşiv boş</string>
+    <string name="archive_empty_subtitle">Arşivlediğiniz sohbetler burada görünecek</string>
+    <string name="trash_empty_title">Çöp kutusu boş</string>
+    <string name="trash_empty_subtitle">Sildiğiniz sohbetler burada görünecek</string>
+    <string name="cd_pin">Sabitle</string>
+    <string name="cd_favorite">Favoriye ekle</string>
+    <string name="cd_archive">Arşivle</string>
+    <string name="cd_unarchive">Arşivden çıkar</string>
+    <string name="cd_pinned">Sabitlenmiş</string>
+    <string name="cd_favorited">Favori</string>
 
     <!-- Search -->
     <string name="search_placeholder">Kelime veya numara ara</string>
@@ -155,4 +186,28 @@
     <string name="spam_retention_description">Spam mesajların otomatik silinmeden önce saklanacağı süreyi belirleyin</string>
     <string name="spam_retention_days">%d gün</string>
     <string name="spam_auto_delete_warning_dynamic">Spam mesajlar %d gün sonra otomatik olarak silinecektir.</string>
+
+    <!-- Background customization -->
+    <string name="background_section_title">Ana menü arka planı</string>
+    <string name="background_section_description">Mesaj listesi için bir arka plan seçin</string>
+    <string name="background_picker_title">Arka plan seç</string>
+    <string name="background_change">Değiştir</string>
+    <string name="background_reset">Sıfırla</string>
+    <string name="background_apply">Uygula</string>
+    <string name="background_cat_gradient">Gradient</string>
+    <string name="background_cat_pattern">Desen</string>
+    <string name="background_cat_solid">Renk</string>
+    <string name="background_cat_image">Galeri</string>
+    <string name="background_pick_image">Galeriden seç</string>
+    <string name="background_pick_image_hint">Görsel seçmek için dokunun</string>
+    <string name="background_conversation_title">Sohbet arka planı</string>
+    <string name="background_conversation_reset">Ana menüye eşitle</string>
+    <string name="cd_more_options">Daha fazla seçenek</string>
+    <string name="notification_sound_custom">Bildirim sesi</string>
+    <string name="notification_sound_default">Varsayilan sistem sesi</string>
+    <string name="notification_sound_pick">Bildirim sesi sec</string>
+    <string name="notification_sound_pick_short">Sec</string>
+    <string name="cd_scroll_to_top">Yukari cik</string>
+    <string name="restore_from_trash">Copten Cikar</string>
+    <string name="cd_restore_from_trash">Copten cikar</string>
 </resources>

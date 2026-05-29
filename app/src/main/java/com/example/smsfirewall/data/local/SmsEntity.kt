@@ -1,5 +1,6 @@
 package com.example.smsfirewall.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -19,4 +20,6 @@ data class SmsEntity(
     val receivedAt: Long,
     val status: String,
     val reason: String,
+    @ColumnInfo(name = "is_starred", defaultValue = "0")
+    val isStarred: Boolean = false,
 )

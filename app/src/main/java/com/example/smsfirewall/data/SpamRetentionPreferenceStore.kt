@@ -13,6 +13,7 @@ class SpamRetentionPreferenceStore(context: Context) {
     }
 
     fun setRetentionDays(days: Int) {
+        require(days in RETENTION_OPTIONS) { "Geçersiz saklama süresi: $days" }
         prefs.edit().putInt(KEY_RETENTION_DAYS, days).apply()
     }
 

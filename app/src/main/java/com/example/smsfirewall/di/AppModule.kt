@@ -1,7 +1,14 @@
 package com.example.smsfirewall.di
 
 import android.content.Context
+import com.example.smsfirewall.data.AppLockPreferenceStore
+import com.example.smsfirewall.data.AppearancePreferenceStore
+import com.example.smsfirewall.data.ConversationMetaStore
+import com.example.smsfirewall.data.PrivacyPreferenceStore
 import com.example.smsfirewall.data.SpamRetentionPreferenceStore
+import com.example.smsfirewall.data.background.BackgroundImageRepository
+import com.example.smsfirewall.data.background.BackgroundPreferenceStore
+import com.example.smsfirewall.data.security.CryptoBox
 import com.example.smsfirewall.filter.FilterKeywordStore
 import com.example.smsfirewall.notifications.MutedSenderStore
 import com.example.smsfirewall.notifications.NotificationPreferenceStore
@@ -16,17 +23,22 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
-
     @Provides
     @Singleton
-    fun provideFilterKeywordStore(@ApplicationContext context: Context): FilterKeywordStore {
-        return FilterKeywordStore(context)
+    fun provideCryptoBox(): CryptoBox {
+        return CryptoBox()
     }
 
     @Provides
     @Singleton
-    fun provideMutedSenderStore(@ApplicationContext context: Context): MutedSenderStore {
-        return MutedSenderStore(context)
+    fun provideFilterKeywordStore(@ApplicationContext context: Context, cryptoBox: CryptoBox): FilterKeywordStore {
+        return FilterKeywordStore(context, cryptoBox)
+    }
+
+    @Provides
+    @Singleton
+    fun provideMutedSenderStore(@ApplicationContext context: Context, cryptoBox: CryptoBox): MutedSenderStore {
+        return MutedSenderStore(context, cryptoBox)
     }
 
     @Provides
@@ -43,7 +55,43 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideAppearancePreferenceStore(@ApplicationContext context: Context): AppearancePreferenceStore {
+        return AppearancePreferenceStore(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAppLockPreferenceStore(@ApplicationContext context: Context, cryptoBox: CryptoBox): AppLockPreferenceStore {
+        return AppLockPreferenceStore(context, cryptoBox)
+    }
+
+    @Provides
+    @Singleton
+    fun providePrivacyPreferenceStore(@ApplicationContext context: Context, cryptoBox: CryptoBox): PrivacyPreferenceStore {
+        return PrivacyPreferenceStore(context, cryptoBox)
+    }
+
+    @Provides
+    @Singleton
     fun provideNotificationPreferenceStore(@ApplicationContext context: Context): NotificationPreferenceStore {
         return NotificationPreferenceStore(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideBackgroundPreferenceStore(@ApplicationContext context: Context): BackgroundPreferenceStore {
+        return BackgroundPreferenceStore(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideBackgroundImageRepository(@ApplicationContext context: Context): BackgroundImageRepository {
+        return BackgroundImageRepository(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideConversationMetaStore(@ApplicationContext context: Context): ConversationMetaStore {
+        return ConversationMetaStore(context)
     }
 }

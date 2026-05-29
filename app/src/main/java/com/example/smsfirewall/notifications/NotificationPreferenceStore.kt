@@ -2,6 +2,7 @@ package com.example.smsfirewall.notifications
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
 
 class NotificationPreferenceStore(context: Context) {
 
@@ -13,6 +14,15 @@ class NotificationPreferenceStore(context: Context) {
 
     fun setSoundEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_SOUND, enabled).apply()
+    }
+
+    fun getSoundUri(): Uri? =
+        prefs.getString(KEY_SOUND_URI, null)?.takeIf { it.isNotBlank() }?.let(Uri::parse)
+
+    fun getSoundUriString(): String? = prefs.getString(KEY_SOUND_URI, null)?.takeIf { it.isNotBlank() }
+
+    fun setSoundUri(uri: Uri?) {
+        prefs.edit().putString(KEY_SOUND_URI, uri?.toString()).apply()
     }
 
     // --- Titreşim ---
@@ -92,6 +102,7 @@ class NotificationPreferenceStore(context: Context) {
     companion object {
         private const val PREF_NAME = "notification_preferences"
         private const val KEY_SOUND = "sound_enabled"
+        private const val KEY_SOUND_URI = "sound_uri"
         private const val KEY_VIBRATION = "vibration_enabled"
         private const val KEY_QUIET_HOURS_ENABLED = "quiet_hours_enabled"
         private const val KEY_QUIET_START_HOUR = "quiet_start_hour"

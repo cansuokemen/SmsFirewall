@@ -3,6 +3,7 @@ package com.example.smsfirewall.ui.inbox
 import android.app.Application
 import android.app.NotificationManager
 import android.database.ContentObserver
+import android.media.AudioAttributes
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -16,8 +17,17 @@ import androidx.compose.runtime.setValue
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.smsfirewall.data.AppearancePreferenceStore
+import com.example.smsfirewall.data.AppTextSize
+import com.example.smsfirewall.data.BubbleStyle
+import com.example.smsfirewall.data.ConversationMetaStore
+import com.example.smsfirewall.data.ListDensity
+import com.example.smsfirewall.data.PrivacyPreferenceStore
 import com.example.smsfirewall.data.SpamRetentionPreferenceStore
 import com.example.smsfirewall.data.SmsRepository
+import com.example.smsfirewall.data.background.BackgroundImageRepository
+import com.example.smsfirewall.data.background.BackgroundPreferenceStore
+import com.example.smsfirewall.data.background.BackgroundSpec
 import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.filter.FilterKeywordStore
 import com.example.smsfirewall.filter.SmsStatus
@@ -27,8 +37,6 @@ import com.example.smsfirewall.notifications.NotificationPreferenceStore
 import com.example.smsfirewall.util.normalizeSender
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,9 +45,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import com.example.smsfirewall.data.AppLockPreferenceStore
 
 enum class ScreenState {
-    LIST, DETAIL, NEW_MESSAGE, SETTINGS
+    LIST, DETAIL, NEW_MESSAGE, SETTINGS, ARCHIVE
 }
 
 sealed interface UiEvent {
@@ -51,9 +60,15 @@ class InboxViewModel @Inject constructor(
     application: Application,
     val repository: SmsRepository,
     val mutedSenderStore: MutedSenderStore,
+    val conversationMetaStore: ConversationMetaStore,
     val filterKeywordStore: FilterKeywordStore,
     val spamRetentionStore: SpamRetentionPreferenceStore,
-    val notificationPreferenceStore: NotificationPreferenceStore
+    val appLockPreferenceStore: AppLockPreferenceStore,
+    val privacyPreferenceStore: PrivacyPreferenceStore,
+    val appearancePreferenceStore: AppearancePreferenceStore,
+    val notificationPreferenceStore: NotificationPreferenceStore,
+    val backgroundPreferenceStore: BackgroundPreferenceStore,
+    val backgroundImageRepository: BackgroundImageRepository
 ) : AndroidViewModel(application) {
 
     private val context get() = getApplication<Application>()
@@ -77,8 +92,29 @@ class InboxViewModel @Inject constructor(
     var selectedTab by mutableStateOf(InboxTab.MESSAGES)
         private set
 
+    var messagesFilter by mutableStateOf(MessagesFilter.ALL)
+        private set
+
+    var conversationMetaToken by mutableIntStateOf(0)
+        private set
+
     var conversationSearchInput by mutableStateOf("")
     var conversationSearchQuery by mutableStateOf("")
+
+    // Sohbet detayı içi arama
+    var detailSearchQuery by mutableStateOf("")
+        private set
+
+    fun setDetailSearch(q: String) { detailSearchQuery = q }
+    fun clearDetailSearch() { detailSearchQuery = "" }
+
+    fun selectMessagesFilter(filter: MessagesFilter) {
+        messagesFilter = filter
+    }
+
+    private fun bumpMeta() {
+        conversationMetaToken++
+    }
 
     // --- Navigasyon ---
     var openedConversationKey by mutableStateOf<String?>(null)
@@ -90,9 +126,13 @@ class InboxViewModel @Inject constructor(
     var isSettingsOpen by mutableStateOf(false)
         private set
 
+    var isArchiveOpen by mutableStateOf(false)
+        private set
+
     val currentScreen: ScreenState
         get() = when {
             isSettingsOpen -> ScreenState.SETTINGS
+            isArchiveOpen -> ScreenState.ARCHIVE
             openedConversationKey != null -> ScreenState.DETAIL
             isNewMessageScreenOpen -> ScreenState.NEW_MESSAGE
             else -> ScreenState.LIST
@@ -113,6 +153,20 @@ class InboxViewModel @Inject constructor(
     var selectedForDelete by mutableStateOf<SmsEntity?>(null)
     var openedSpamMessage by mutableStateOf<SmsEntity?>(null)
 
+    // --- Silme animasyonu state ---
+    var pendingCrumpleAnim by mutableStateOf<SmsEntity?>(null)
+        private set
+    var pendingShredderAnim by mutableStateOf<List<SmsConversation>?>(null)
+        private set
+
+    fun beginCrumpleAnim(sms: SmsEntity) { pendingCrumpleAnim = sms }
+    fun finishCrumpleAnim() { pendingCrumpleAnim = null }
+
+    fun beginShredderAnim(conversations: List<SmsConversation>) {
+        if (conversations.isNotEmpty()) pendingShredderAnim = conversations
+    }
+    fun finishShredderAnim() { pendingShredderAnim = null }
+
     // --- Swipe aksiyonları ---
     var actionRevealedConversationKey by mutableStateOf<String?>(null)
 
@@ -122,12 +176,8 @@ class InboxViewModel @Inject constructor(
         val tab: InboxTab
     )
 
-    var pendingDelete by mutableStateOf<PendingDelete?>(null)
-        private set
-    private var pendingDeleteJob: Job? = null
     private companion object {
         const val MAX_CONTACT_CACHE_SIZE = 256
-        const val UNDO_TIMEOUT_MS = 4000L
     }
 
     // --- Yenileme ---
@@ -151,8 +201,107 @@ class InboxViewModel @Inject constructor(
         spamRetentionDays = days
     }
 
+    // --- Gorunum tercihleri ---
+    var listDensity by mutableStateOf(appearancePreferenceStore.getListDensity())
+        private set
+
+    var appTextSize by mutableStateOf(appearancePreferenceStore.getTextSize())
+        private set
+
+    var bubbleStyle by mutableStateOf(appearancePreferenceStore.getBubbleStyle())
+        private set
+
+    fun updateListDensity(value: ListDensity) {
+        appearancePreferenceStore.setListDensity(value)
+        listDensity = value
+    }
+
+    fun updateAppTextSize(value: AppTextSize) {
+        appearancePreferenceStore.setTextSize(value)
+        appTextSize = value
+    }
+
+    fun updateBubbleStyle(value: BubbleStyle) {
+        appearancePreferenceStore.setBubbleStyle(value)
+        bubbleStyle = value
+    }
+
+    // --- Guvenlik tercihleri ---
+    var isAppLockEnabled by mutableStateOf(appLockPreferenceStore.isLockEnabled())
+        private set
+
+    var isPinConfigured by mutableStateOf(appLockPreferenceStore.hasPin())
+        private set
+
+    var isBiometricLockEnabled by mutableStateOf(appLockPreferenceStore.isBiometricEnabled())
+        private set
+
+    fun setAppLockPin(pin: String) {
+        appLockPreferenceStore.setPin(pin)
+        isPinConfigured = true
+        isAppLockEnabled = true
+        isBiometricLockEnabled = appLockPreferenceStore.isBiometricEnabled()
+    }
+
+    fun clearAppLock() {
+        appLockPreferenceStore.clearLock()
+        isPinConfigured = false
+        isAppLockEnabled = false
+        isBiometricLockEnabled = false
+    }
+
+    fun updateBiometricLockEnabled(enabled: Boolean) {
+        appLockPreferenceStore.setBiometricEnabled(enabled)
+        isBiometricLockEnabled = appLockPreferenceStore.isBiometricEnabled()
+    }
+
+    // --- Gizlilik / veri tercihleri ---
+    var trashRetentionDays by mutableStateOf(privacyPreferenceStore.getTrashRetentionDays())
+        private set
+
+    var privateAreaEncryptionEnabled by mutableStateOf(privacyPreferenceStore.isPrivateAreaEncryptionEnabled())
+        private set
+
+    fun updateTrashRetention(days: Int) {
+        privacyPreferenceStore.setTrashRetentionDays(days)
+        trashRetentionDays = days
+        cleanupExpiredTrash()
+    }
+
+    fun updatePrivateAreaEncryption(enabled: Boolean) {
+        privacyPreferenceStore.setPrivateAreaEncryptionEnabled(enabled)
+        privateAreaEncryptionEnabled = enabled
+    }
+
+    fun cleanupExpiredTrash() {
+        if (privacyPreferenceStore.getTrashRetentionDays() == PrivacyPreferenceStore.RETENTION_NEVER) return
+        viewModelScope.launch {
+            repository.deleteByStatusBefore(
+                status = SmsStatus.TRASH,
+                beforeTimestamp = privacyPreferenceStore.trashCutoffTimestamp()
+            )
+        }
+    }
+
+    fun emptyTrash(onComplete: (Int) -> Unit = {}) {
+        viewModelScope.launch {
+            val deleted = repository.deleteAllByStatus(SmsStatus.TRASH)
+            onComplete(deleted)
+        }
+    }
+
+    fun emptySpam(onComplete: (Int) -> Unit = {}) {
+        viewModelScope.launch {
+            val deleted = repository.deleteAllByStatus(SmsStatus.BLOCK)
+            onComplete(deleted)
+        }
+    }
+
     // --- Bildirim tercihleri ---
     var notifSoundEnabled by mutableStateOf(notificationPreferenceStore.isSoundEnabled())
+        private set
+
+    var notifSoundUriString by mutableStateOf(notificationPreferenceStore.getSoundUriString())
         private set
 
     var notifVibrationEnabled by mutableStateOf(notificationPreferenceStore.isVibrationEnabled())
@@ -170,11 +319,19 @@ class InboxViewModel @Inject constructor(
     fun setNotifSound(enabled: Boolean) {
         notificationPreferenceStore.setSoundEnabled(enabled)
         notifSoundEnabled = enabled
+        recreateNotificationChannel()
+    }
+
+    fun setNotifSoundUri(uri: Uri?) {
+        notificationPreferenceStore.setSoundUri(uri)
+        notifSoundUriString = notificationPreferenceStore.getSoundUriString()
+        if (uri != null) setNotifSound(true) else recreateNotificationChannel()
     }
 
     fun setNotifVibration(enabled: Boolean) {
         notificationPreferenceStore.setVibrationEnabled(enabled)
         notifVibrationEnabled = enabled
+        recreateNotificationChannel()
     }
 
     fun setNotifQuietHours(enabled: Boolean) {
@@ -192,6 +349,90 @@ class InboxViewModel @Inject constructor(
         notifQuietEnd = hour to minute
     }
 
+    private fun recreateNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        manager.deleteNotificationChannel(NotificationConstants.ALLOWED_SMS_CHANNEL_ID)
+        val channel = android.app.NotificationChannel(
+            NotificationConstants.ALLOWED_SMS_CHANNEL_ID,
+            context.getString(com.example.smsfirewall.R.string.notification_channel_name),
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            if (notificationPreferenceStore.isSoundEnabled()) {
+                notificationPreferenceStore.getSoundUri()?.let { uri ->
+                    setSound(
+                        uri,
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                }
+            } else {
+                setSound(null, null)
+            }
+            enableVibration(notificationPreferenceStore.isVibrationEnabled())
+            enableLights(true)
+        }
+        manager.createNotificationChannel(channel)
+    }
+
+    // --- Arka plan tercihleri ---
+    var mainBackground by mutableStateOf<BackgroundSpec>(backgroundPreferenceStore.getMainBackground())
+        private set
+
+    private val conversationBackgrounds = mutableStateMapOf<String, BackgroundSpec>()
+
+    fun applyMainBackground(spec: BackgroundSpec) {
+        backgroundPreferenceStore.setMainBackground(spec)
+        mainBackground = spec
+        viewModelScope.launch {
+            backgroundImageRepository.pruneUnused(backgroundPreferenceStore)
+        }
+    }
+
+    fun resetMainBackground() {
+        backgroundPreferenceStore.resetMainBackground()
+        mainBackground = BackgroundSpec.Default
+        viewModelScope.launch {
+            backgroundImageRepository.pruneUnused(backgroundPreferenceStore)
+        }
+    }
+
+    /** Bir sohbetin etkin arka planını döner: özel atama varsa onu, yoksa ana menüyü. */
+    fun backgroundFor(address: String): BackgroundSpec {
+        val key = normalizeSender(address)
+        if (key.isBlank()) return mainBackground
+        val cached = conversationBackgrounds[key]
+        if (cached != null) return cached
+        val stored = backgroundPreferenceStore.getConversationBackground(address)
+        if (stored != null) {
+            conversationBackgrounds[key] = stored
+            return stored
+        }
+        return mainBackground
+    }
+
+    fun applyConversationBackground(address: String, spec: BackgroundSpec) {
+        val key = normalizeSender(address)
+        if (key.isBlank()) return
+        backgroundPreferenceStore.setConversationBackground(address, spec)
+        conversationBackgrounds[key] = spec
+        viewModelScope.launch {
+            backgroundImageRepository.pruneUnused(backgroundPreferenceStore)
+        }
+    }
+
+    fun resetConversationBackground(address: String) {
+        val key = normalizeSender(address)
+        if (key.isBlank()) return
+        backgroundPreferenceStore.resetConversationBackground(address)
+        conversationBackgrounds.remove(key)
+        viewModelScope.launch {
+            backgroundImageRepository.pruneUnused(backgroundPreferenceStore)
+        }
+    }
+
     // --- Kişi adı cache ---
     val contactNameCache = mutableStateMapOf<String, String?>()
     private val pendingLookups = mutableSetOf<String>()
@@ -203,8 +444,7 @@ class InboxViewModel @Inject constructor(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val manager = context.getSystemService(NotificationManager::class.java)
                 val channel = manager?.getNotificationChannel(NotificationConstants.ALLOWED_SMS_CHANNEL_ID)
-                if (channel == null) return true
-                return channel.importance < NotificationManager.IMPORTANCE_HIGH
+                return channel != null && channel.importance < NotificationManager.IMPORTANCE_HIGH
             }
             return false
         }
@@ -216,6 +456,14 @@ class InboxViewModel @Inject constructor(
             contentObserver
         )
         refreshSystemMessages()
+        viewModelScope.launch {
+            repository.migratePlaintextSensitiveRows()
+            repository.deleteByStatusBefore(
+                status = SmsStatus.BLOCK,
+                beforeTimestamp = spamRetentionStore.cutoffTimestamp()
+            )
+            cleanupExpiredTrash()
+        }
     }
 
     override fun onCleared() {
@@ -257,13 +505,11 @@ class InboxViewModel @Inject constructor(
         selectedTab = tab
         isSelectionMode = false
         selectedConversationKeys = emptySet()
-        if (tab == InboxTab.SPAM) {
-            viewModelScope.launch {
-                repository.deleteByStatusBefore(
-                    status = SmsStatus.BLOCK,
-                    beforeTimestamp = spamRetentionStore.cutoffTimestamp()
-                )
-            }
+    }
+
+    fun toggleMessageStar(sms: SmsEntity) {
+        viewModelScope.launch {
+            repository.setMessageStarred(sms.id, !sms.isStarred)
         }
     }
 
@@ -349,41 +595,90 @@ class InboxViewModel @Inject constructor(
         isSelectionMode = false
         selectedConversationKeys = emptySet()
         if (toDelete.isNotEmpty()) {
-            schedulePendingDelete(PendingDelete(toDelete, selectedTab))
+            deleteConversationsNow(PendingDelete(toDelete, selectedTab))
         }
+    }
+
+    fun togglePinSelected(visibleConversations: List<SmsConversation>) {
+        val targets = visibleConversations.filter { it.senderKey in selectedConversationKeys }
+        if (targets.isEmpty()) return
+        val anyUnpinned = targets.any { !it.isPinned }
+        targets.forEach { conversationMetaStore.setPinned(it.displaySender, anyUnpinned) }
+        bumpMeta()
+        exitSelectionMode()
+    }
+
+    fun toggleFavoriteSelected(visibleConversations: List<SmsConversation>) {
+        val targets = visibleConversations.filter { it.senderKey in selectedConversationKeys }
+        if (targets.isEmpty()) return
+        val anyUnfav = targets.any { !it.isFavorite }
+        targets.forEach { conversationMetaStore.setFavorite(it.displaySender, anyUnfav) }
+        bumpMeta()
+        exitSelectionMode()
+    }
+
+    fun toggleMuteSelected(visibleConversations: List<SmsConversation>) {
+        val targets = visibleConversations.filter { it.senderKey in selectedConversationKeys }
+        if (targets.isEmpty()) return
+        val anyUnmuted = targets.any { !mutedSenderStore.isMuted(it.displaySender) }
+        targets.forEach {
+            if (anyUnmuted) mutedSenderStore.mute(it.displaySender)
+            else mutedSenderStore.unmute(it.displaySender)
+        }
+        mutedSendersChangeToken++
+        exitSelectionMode()
+    }
+
+    fun archiveSelected(visibleConversations: List<SmsConversation>) {
+        val targets = visibleConversations.filter { it.senderKey in selectedConversationKeys }
+        if (targets.isEmpty()) return
+        targets.forEach { conversationMetaStore.setArchived(it.displaySender, true) }
+        bumpMeta()
+        exitSelectionMode()
+    }
+
+    fun unarchiveSelected(visibleConversations: List<SmsConversation>) {
+        val targets = visibleConversations.filter { it.senderKey in selectedConversationKeys }
+        if (targets.isEmpty()) return
+        targets.forEach { conversationMetaStore.setArchived(it.displaySender, false) }
+        bumpMeta()
+        exitSelectionMode()
+    }
+
+    fun restoreTrashSelected(visibleConversations: List<SmsConversation>) {
+        val targets = visibleConversations.filter { it.senderKey in selectedConversationKeys }
+        if (targets.isEmpty()) return
+        exitSelectionMode()
+        viewModelScope.launch {
+            for (conv in targets) {
+                for (sms in conv.messages) {
+                    restoreStoredSmsToSystemInbox(context, repository, sms)
+                }
+            }
+            refreshSystemMessages()
+            selectTab(InboxTab.MESSAGES)
+        }
+    }
+
+    fun openArchive() {
+        exitSelectionMode()
+        isArchiveOpen = true
+    }
+
+    fun closeArchive() {
+        exitSelectionMode()
+        isArchiveOpen = false
     }
 
     // --- Konuşma aksiyonları ---
 
     fun deleteConversation(conversation: SmsConversation) {
         actionRevealedConversationKey = null
-        schedulePendingDelete(PendingDelete(listOf(conversation), selectedTab))
+        deleteConversationsNow(PendingDelete(listOf(conversation), selectedTab))
     }
 
-    fun undoDelete() {
-        pendingDeleteJob?.cancel()
-        pendingDelete = null
-    }
-
-    fun commitPendingDelete() {
-        val delete = pendingDelete ?: return
-        pendingDeleteJob?.cancel()
-        pendingDelete = null
+    private fun deleteConversationsNow(delete: PendingDelete) {
         viewModelScope.launch {
-            performDelete(delete)
-        }
-    }
-
-    private fun schedulePendingDelete(delete: PendingDelete) {
-        // Eğer önceki bir pending varsa, önce onu commit et
-        pendingDelete?.let { previous ->
-            pendingDeleteJob?.cancel()
-            viewModelScope.launch { performDelete(previous) }
-        }
-        pendingDelete = delete
-        pendingDeleteJob = viewModelScope.launch {
-            delay(UNDO_TIMEOUT_MS)
-            pendingDelete = null
             performDelete(delete)
         }
     }
@@ -391,13 +686,37 @@ class InboxViewModel @Inject constructor(
     private suspend fun performDelete(delete: PendingDelete) {
         for (conv in delete.conversations) {
             for (sms in conv.messages) {
-                if (delete.tab == InboxTab.MESSAGES) {
+                if (delete.tab == InboxTab.MESSAGES || delete.tab == InboxTab.ARCHIVE) {
+                    repository.insert(
+                        SmsEntity(
+                            id = 0,
+                            sender = sms.sender,
+                            body = sms.body,
+                            receivedAt = sms.receivedAt,
+                            status = SmsStatus.TRASH,
+                            reason = sms.reason
+                        )
+                    )
                     deleteSmsFromSystemProvider(context, sms.id)
+                    conversationMetaStore.setArchived(conv.displaySender, false)
+                } else if (delete.tab == InboxTab.SPAM) {
+                    repository.insert(
+                        SmsEntity(
+                            id = 0,
+                            sender = sms.sender,
+                            body = sms.body,
+                            receivedAt = sms.receivedAt,
+                            status = SmsStatus.TRASH,
+                            reason = sms.reason
+                        )
+                    )
+                    repository.delete(sms)
                 } else {
                     repository.delete(sms)
                 }
             }
         }
+        bumpMeta()
     }
 
     fun muteNotifications(sender: String) {
@@ -419,14 +738,64 @@ class InboxViewModel @Inject constructor(
         }
     }
 
+    fun markSelectedAsSpam(visibleConversations: List<SmsConversation>) {
+        val targets = visibleConversations.filter { it.senderKey in selectedConversationKeys }
+        if (targets.isEmpty()) return
+        exitSelectionMode()
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                for (conv in targets) {
+                    for (sms in conv.messages) {
+                        repository.insert(
+                            SmsEntity(
+                                id         = 0,
+                                sender     = sms.sender,
+                                body       = sms.body,
+                                receivedAt = sms.receivedAt,
+                                status     = SmsStatus.BLOCK,
+                                reason     = "Manually marked as spam"
+                            )
+                        )
+                        if (sms.reason != SENT_MESSAGE_REASON) {
+                            deleteSmsFromSystemProvider(context, sms.id)
+                        }
+                    }
+                }
+            }
+            selectTab(InboxTab.SPAM)
+        }
+    }
+
     fun deleteSpam(sms: SmsEntity) {
         viewModelScope.launch { repository.delete(sms) }
     }
 
     fun deleteSingleMessage(sms: SmsEntity) {
         viewModelScope.launch {
-            if (selectedTab == InboxTab.MESSAGES) {
+            if (selectedTab == InboxTab.MESSAGES || selectedTab == InboxTab.ARCHIVE) {
+                repository.insert(
+                    SmsEntity(
+                        id = 0,
+                        sender = sms.sender,
+                        body = sms.body,
+                        receivedAt = sms.receivedAt,
+                        status = SmsStatus.TRASH,
+                        reason = sms.reason
+                    )
+                )
                 deleteSmsFromSystemProvider(context, sms.id)
+            } else if (selectedTab == InboxTab.SPAM) {
+                repository.insert(
+                    SmsEntity(
+                        id = 0,
+                        sender = sms.sender,
+                        body = sms.body,
+                        receivedAt = sms.receivedAt,
+                        status = SmsStatus.TRASH,
+                        reason = sms.reason
+                    )
+                )
+                repository.delete(sms)
             } else {
                 repository.delete(sms)
             }

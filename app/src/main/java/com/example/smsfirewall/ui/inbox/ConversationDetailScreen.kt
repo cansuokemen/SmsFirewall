@@ -3,14 +3,17 @@ package com.example.smsfirewall.ui.inbox
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +25,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -33,14 +41,39 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -50,12 +83,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.smsfirewall.R
+import com.example.smsfirewall.data.AppTextSize
+import com.example.smsfirewall.data.BubbleStyle
+import com.example.smsfirewall.data.background.BackgroundSpec
 import com.example.smsfirewall.data.local.SmsEntity
+import com.example.smsfirewall.ui.background.AppBackground
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -64,35 +102,102 @@ internal fun ConversationDetailScreen(
     contactName: String?,
     canSendMessage: Boolean,
     isSpamConversation: Boolean,
-    callbacks: DetailScreenCallbacks
+    backgroundSpec: BackgroundSpec,
+    textSize: AppTextSize,
+    bubbleStyle: BubbleStyle,
+    onChangeBackground: () -> Unit,
+    onResetBackground: () -> Unit,
+    callbacks: DetailScreenCallbacks,
+    detailSearchQuery: String = "",
+    onDetailSearchChange: (String) -> Unit = {},
+    onDetailSearchClear: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var draftMessage by remember(conversation.senderKey) { mutableStateOf("") }
-    val listState = rememberLazyListState()
-    val focusManager = LocalFocusManager.current
+    val listState       = rememberLazyListState()
+    val focusManager    = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val density = LocalDensity.current
-    val displayMessages = remember(conversation.messages) { conversation.messages.asReversed() }
+    val haptic          = LocalHapticFeedback.current
+    val density         = LocalDensity.current
+    val allMessages     = remember(conversation.messages) { conversation.messages.asReversed() }
+    val displayMessages = remember(allMessages, detailSearchQuery) {
+        val q = detailSearchQuery.trim()
+        if (q.isBlank()) allMessages else allMessages.filter { it.body.contains(q, ignoreCase = true) }
+    }
+    var searchBarVisible by remember { mutableStateOf(false) }
     val isKeyboardVisible = WindowInsets.ime.getBottom(density) > 0
 
+    val sendButtonScale by animateFloatAsState(
+        targetValue   = if (draftMessage.isNotBlank()) 1f else 0.88f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+        label         = "sendScale"
+    )
+    val sendButtonRotation by animateFloatAsState(
+        targetValue   = if (draftMessage.isNotBlank()) -25f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+        label         = "sendRotation"
+    )
+    val sendButtonColor by animateColorAsState(
+        targetValue   = if (draftMessage.isNotBlank()) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant,
+        animationSpec = tween(220),
+        label         = "sendColor"
+    )
+    val sendIconColor by animateColorAsState(
+        targetValue   = if (draftMessage.isNotBlank()) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+        animationSpec = tween(220),
+        label         = "sendIconColor"
+    )
+    val launchAnim = remember { Animatable(0f) }
+    val inputInteractionSource = remember { MutableInteractionSource() }
+    val isInputFocused by inputInteractionSource.collectIsFocusedAsState()
+    val inputBorderColor by animateColorAsState(
+        targetValue   = if (isInputFocused) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+        animationSpec = tween(250),
+        label         = "inputBorder"
+    )
+
+    val displayName   = contactName ?: conversation.displaySender
+    val avatarLetter  = displayName.firstOrNull()?.uppercase() ?: "?"
+    val avatarColor   = avatarColorForSender(conversation.displaySender)
+    val avatarBrush   = remember(avatarColor) {
+        Brush.linearGradient(
+            colors = listOf(
+                avatarColor,
+                Color(
+                    red   = (avatarColor.red   + (1f - avatarColor.red)   * 0.35f).coerceIn(0f, 1f),
+                    green = (avatarColor.green + (1f - avatarColor.green) * 0.35f).coerceIn(0f, 1f),
+                    blue  = (avatarColor.blue  + (1f - avatarColor.blue)  * 0.35f).coerceIn(0f, 1f),
+                    alpha = 1f
+                )
+            ),
+            start = Offset(0f, 0f),
+            end   = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+        )
+    }
+
     LaunchedEffect(displayMessages.size) {
-        if (displayMessages.isNotEmpty()) {
-            listState.scrollToItem(0)
-        }
+        if (displayMessages.isNotEmpty()) listState.scrollToItem(0)
     }
 
     LaunchedEffect(isKeyboardVisible) {
-        if (isKeyboardVisible && displayMessages.isNotEmpty()) {
-            listState.animateScrollToItem(0)
-        }
+        if (isKeyboardVisible && displayMessages.isNotEmpty()) listState.animateScrollToItem(0)
     }
 
+    val coroutineScope = rememberCoroutineScope()
     fun submitMessage() {
         if (!canSendMessage) return
         val text = draftMessage.trim()
         if (text.isBlank()) return
         callbacks.onSendMessage(text)
         draftMessage = ""
+        coroutineScope.launch {
+            launchAnim.snapTo(0f)
+            launchAnim.animateTo(1f, animationSpec = tween(durationMillis = 140))
+            launchAnim.animateTo(0f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium))
+        }
     }
 
     val handleBack = {
@@ -101,97 +206,209 @@ internal fun ConversationDetailScreen(
         callbacks.onBack()
     }
 
-    val displayName = contactName ?: conversation.displaySender
+    var menuExpanded by remember { mutableStateOf(false) }
 
-    Column(
+    AppBackground(
+        spec = backgroundSpec,
         modifier = Modifier
             .fillMaxSize()
             .swipeBackGesture(onBack = handleBack)
-            .background(MaterialTheme.colorScheme.background)
+    ) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
     ) {
         TopAppBar(
             title = {
-                Column {
-                    Text(
-                        text = displayName,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    if (contactName != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Mini gradient avatar
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(avatarBrush),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            text = conversation.displaySender,
+                            text       = avatarLetter,
+                            style      = MaterialTheme.typography.labelLarge,
+                            color      = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Column {
+                        Text(
+                            text     = displayName,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style    = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
                         )
+                        if (contactName != null) {
+                            Text(
+                                text     = conversation.displaySender,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style    = MaterialTheme.typography.bodySmall,
+                                color    = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             },
             navigationIcon = {
-                IconButton(onClick = handleBack) {
+                IconButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                    handleBack()
+                }) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(R.string.cd_back)
                     )
                 }
             },
+            actions = {
+                IconButton(onClick = {
+                    searchBarVisible = !searchBarVisible
+                    if (!searchBarVisible) onDetailSearchClear()
+                }) {
+                    Icon(
+                        imageVector        = if (searchBarVisible) Icons.Filled.Close else Icons.Outlined.Search,
+                        contentDescription = stringResource(R.string.cd_search)
+                    )
+                }
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            imageVector        = Icons.Filled.MoreVert,
+                            contentDescription = stringResource(R.string.cd_more_options)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.background_conversation_title)) },
+                            onClick = {
+                                menuExpanded = false
+                                onChangeBackground()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.background_conversation_reset)) },
+                            onClick = {
+                                menuExpanded = false
+                                onResetBackground()
+                            }
+                        )
+                    }
+                }
+            },
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.background
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)
             )
         )
+
+        AnimatedVisibility(
+            visible = searchBarVisible,
+            enter   = fadeIn(tween(180)) + androidx.compose.animation.expandVertically(),
+            exit    = fadeOut(tween(180)) + androidx.compose.animation.shrinkVertically(tween(180))
+        ) {
+            OutlinedTextField(
+                value         = detailSearchQuery,
+                onValueChange = onDetailSearchChange,
+                modifier      = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                singleLine    = true,
+                shape         = RoundedCornerShape(24.dp),
+                placeholder   = { Text("Mesajlarda ara...") },
+                leadingIcon   = {
+                    Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
+                },
+                trailingIcon  = if (detailSearchQuery.isNotEmpty()) ({
+                    IconButton(onClick = onDetailSearchClear) {
+                        Icon(imageVector = Icons.Filled.Close, contentDescription = null)
+                    }
+                }) else null,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor   = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.74f)
+                )
+            )
+        }
 
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            state = listState,
+            state   = listState,
             reverseLayout = true,
             verticalArrangement = Arrangement.spacedBy(4.dp),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
         ) {
-            var lastDateHeader: String? = null
             displayMessages.forEachIndexed { index, sms ->
                 val dateHeader = formatDateHeader(context, sms.receivedAt)
-                val nextSms = displayMessages.getOrNull(index + 1)
+                val nextSms    = displayMessages.getOrNull(index + 1)
                 val nextDateHeader = nextSms?.let { formatDateHeader(context, it.receivedAt) }
 
                 item(key = sms.id) {
                     DetailMessageBubble(
-                        sms = sms,
-                        onClick = {
+                        modifier  = Modifier.animateItem(),
+                        sms       = sms,
+                        textSize  = textSize,
+                        bubbleStyle = bubbleStyle,
+                        onClick   = {
                             focusManager.clearFocus()
                             keyboardController?.hide()
-                            if (isSpamConversation) {
-                                callbacks.onSpamMessageClick(sms)
-                            }
+                            if (isSpamConversation) callbacks.onSpamMessageClick(sms)
                         },
                         onLongPress = { callbacks.onMessageLongPress(sms) }
                     )
                     if (isSpamConversation) {
                         SpamMessageActionRow(
                             onMarkAsNotSpam = { callbacks.onMarkAsNotSpam(sms) },
-                            onDelete = { callbacks.onDeleteSpam(sms) }
+                            onDelete        = { callbacks.onDeleteSpam(sms) }
                         )
                     }
                 }
 
                 if (dateHeader != nextDateHeader) {
                     item(key = "date_header_$index") {
+                        val headerScale = remember(dateHeader) { Animatable(0.8f) }
+                        val headerAlpha = remember(dateHeader) { Animatable(0f) }
+                        LaunchedEffect(dateHeader) {
+                            headerAlpha.animateTo(1f, animationSpec = tween(280))
+                        }
+                        LaunchedEffect(dateHeader) {
+                            headerScale.animateTo(
+                                targetValue   = 1f,
+                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+                            )
+                        }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp),
+                                .padding(vertical = 8.dp)
+                                .graphicsLayer {
+                                    scaleX = headerScale.value
+                                    scaleY = headerScale.value
+                                    alpha  = headerAlpha.value
+                                },
                             horizontalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = dateHeader,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                text     = dateHeader,
+                                style    = MaterialTheme.typography.labelMedium,
+                                color    = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                 modifier = Modifier
                                     .background(
-                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                                         RoundedCornerShape(12.dp)
                                     )
                                     .padding(horizontal = 12.dp, vertical = 4.dp)
@@ -206,14 +423,15 @@ internal fun ConversationDetailScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.72f))
+                    .navigationBarsPadding()
                     .imePadding()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedTextField(
-                    value = draftMessage,
+                    value         = draftMessage,
                     onValueChange = { draftMessage = it },
                     modifier = Modifier
                         .weight(1f)
@@ -224,51 +442,58 @@ internal fun ConversationDetailScreen(
                                 submitMessage()
                                 keyboardController?.hide()
                                 true
-                            } else {
-                                false
-                            }
+                            } else false
                         },
-                    singleLine = true,
-                    shape = RoundedCornerShape(24.dp),
+                    interactionSource = inputInteractionSource,
+                    singleLine  = true,
+                    shape       = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
+                        focusedContainerColor   = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.74f),
+                        focusedBorderColor      = inputBorderColor,
+                        unfocusedBorderColor    = inputBorderColor
                     ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(
-                        onSend = {
-                            submitMessage()
-                            keyboardController?.hide()
-                        }
+                        onSend = { submitMessage(); keyboardController?.hide() }
                     ),
                     placeholder = {
                         Text(
-                            text = stringResource(R.string.message_input_placeholder),
+                            text  = stringResource(R.string.message_input_placeholder),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 )
                 FilledIconButton(
-                    onClick = {
-                        submitMessage()
-                        keyboardController?.hide()
-                    },
-                    enabled = draftMessage.isNotBlank(),
-                    modifier = Modifier.size(48.dp),
-                    shape = CircleShape,
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    onClick  = { submitMessage(); keyboardController?.hide() },
+                    enabled  = draftMessage.isNotBlank(),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .graphicsLayer {
+                            scaleX = sendButtonScale
+                            scaleY = sendButtonScale
+                            rotationZ = sendButtonRotation
+                        },
+                    shape    = CircleShape,
+                    colors   = IconButtonDefaults.filledIconButtonColors(
+                        containerColor         = sendButtonColor,
+                        contentColor           = sendIconColor,
+                        disabledContainerColor = sendButtonColor,
+                        disabledContentColor   = sendIconColor
                     )
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = stringResource(R.string.cd_send)
+                        imageVector        = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = stringResource(R.string.cd_send),
+                        modifier = Modifier.graphicsLayer {
+                            translationX = 14f * this.density * launchAnim.value
+                            translationY = -10f * this.density * launchAnim.value
+                            alpha = 1f - 0.5f * launchAnim.value
+                        }
                     )
                 }
             }
         }
     }
+    } // AppBackground
 }

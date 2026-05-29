@@ -1,5 +1,6 @@
 package com.example.smsfirewall.ui.inbox
 
+import com.example.smsfirewall.data.ConversationMetaStore
 import com.example.smsfirewall.data.local.SmsEntity
 import com.example.smsfirewall.util.PHONE_COMPARE_LENGTH
 import com.example.smsfirewall.util.normalizeSender
@@ -8,7 +9,8 @@ import java.util.Locale
 internal fun buildConversations(
     messages: List<SmsEntity>,
     unreadIds: Set<Long> = emptySet(),
-    unknownSenderLabel: String = "Bilinmeyen gönderici"
+    unknownSenderLabel: String = "Bilinmeyen gönderici",
+    metaStore: ConversationMetaStore? = null
 ): List<SmsConversation> {
     return messages
         .groupBy { normalizeSenderForGrouping(it.sender) }
@@ -23,15 +25,23 @@ internal fun buildConversations(
                 senderMessages.count { it.id in unreadIds }
             }
 
+            val displaySender = latestMessage.sender.ifBlank { unknownSenderLabel }
+            val isPinned = metaStore?.isPinned(displaySender) == true
+            val isFavorite = metaStore?.isFavorite(displaySender) == true
+            val isArchived = metaStore?.isArchived(displaySender) == true
+
             SmsConversation(
                 senderKey = senderKey.ifBlank { "unknown_sender_${latestMessage.id}" },
-                displaySender = latestMessage.sender.ifBlank { unknownSenderLabel },
+                displaySender = displaySender,
                 messages = sortedMessages,
                 latestReceivedAt = latestMessage.receivedAt,
-                unreadCount = unread
+                unreadCount = unread,
+                isPinned = isPinned,
+                isFavorite = isFavorite,
+                isArchived = isArchived
             )
         }
-        .sortedByDescending { it.latestReceivedAt }
+        .sortedWith(compareByDescending<SmsConversation> { it.isPinned }.thenByDescending { it.latestReceivedAt })
 }
 
 internal fun normalizeSenderForGrouping(sender: String): String {

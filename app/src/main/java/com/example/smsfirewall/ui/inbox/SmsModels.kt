@@ -1,7 +1,11 @@
 package com.example.smsfirewall.ui.inbox
 
 import com.example.smsfirewall.R
+import com.example.smsfirewall.data.AppTextSize
+import com.example.smsfirewall.data.BubbleStyle
+import com.example.smsfirewall.data.ListDensity
 import com.example.smsfirewall.data.local.SmsEntity
+import androidx.compose.ui.unit.dp
 
 internal const val SENT_MESSAGE_REASON = "Sent by user"
 internal const val SYSTEM_PROVIDER_REASON = "From system provider"
@@ -11,7 +15,15 @@ internal const val UNREAD_BADGE_MAX = 99
 
 enum class InboxTab(val titleResId: Int) {
     MESSAGES(R.string.tab_messages),
-    SPAM(R.string.tab_spam)
+    SPAM(R.string.tab_spam),
+    ARCHIVE(R.string.tab_archive),
+    TRASH(R.string.tab_trash)
+}
+
+enum class MessagesFilter(val titleResId: Int) {
+    ALL(R.string.filter_all),
+    UNREAD(R.string.filter_unread),
+    FAVORITES(R.string.filter_favorites)
 }
 
 data class SmsConversation(
@@ -19,7 +31,10 @@ data class SmsConversation(
     val displaySender: String,
     val messages: List<SmsEntity>,
     val latestReceivedAt: Long,
-    val unreadCount: Int = 0
+    val unreadCount: Int = 0,
+    val isPinned: Boolean = false,
+    val isFavorite: Boolean = false,
+    val isArchived: Boolean = false
 )
 
 data class SystemMessagesResult(
@@ -56,3 +71,16 @@ data class DetailScreenCallbacks(
     val onDeleteSpam: (SmsEntity) -> Unit = {},
     val onSendMessage: (String) -> Unit = {}
 )
+
+internal fun AppTextSize.bodyScale(): Float = when (this) {
+    AppTextSize.SMALL -> 0.92f
+    AppTextSize.NORMAL -> 1f
+    AppTextSize.LARGE -> 1.12f
+}
+
+internal fun ListDensity.itemVerticalPadding(): androidx.compose.ui.unit.Dp = when (this) {
+    ListDensity.COMFORTABLE -> 10.dp
+    ListDensity.COMPACT -> 7.dp
+}
+
+internal fun BubbleStyle.isSoft(): Boolean = this == BubbleStyle.SOFT
