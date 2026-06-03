@@ -192,6 +192,10 @@ class InboxViewModel @Inject constructor(
     var blockedSenders by mutableStateOf(filterKeywordStore.getBlockedSenders())
         private set
 
+    // --- Engellenen anahtar kelimeler ---
+    var blockedKeywords by mutableStateOf(filterKeywordStore.getBlockedKeywords())
+        private set
+
     // --- Spam saklama süresi ---
     var spamRetentionDays by mutableStateOf(spamRetentionStore.getRetentionDays())
         private set
@@ -847,6 +851,22 @@ class InboxViewModel @Inject constructor(
             }
             refreshSystemMessages()
         }
+    }
+
+    // --- Engellenen anahtar kelime aksiyonları ---
+
+    fun addBlockedKeyword(keyword: String): Boolean {
+        val normalized = keyword.trim().lowercase(java.util.Locale.ROOT)
+        if (normalized.isBlank()) return false
+        if (blockedKeywords.any { it == normalized }) return false
+        filterKeywordStore.addKeyword(keyword)
+        blockedKeywords = filterKeywordStore.getBlockedKeywords()
+        return true
+    }
+
+    fun removeBlockedKeyword(keyword: String) {
+        filterKeywordStore.removeKeyword(keyword)
+        blockedKeywords = filterKeywordStore.getBlockedKeywords()
     }
 }
 

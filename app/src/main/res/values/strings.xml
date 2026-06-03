@@ -160,6 +160,20 @@
     <string name="no_blocked_numbers">Henüz engellenen numara yok</string>
     <string name="cd_remove_blocked_number">Engeli kaldır</string>
     <string name="cd_add_blocked_number">Numara engelle</string>
+
+    <!-- Blocked keywords settings -->
+    <string name="blocked_keywords">Engellenen Anahtar Kelimeler</string>
+    <string name="blocked_keywords_description">Bu kelimeleri içeren mesajlar spam olarak işaretlenir</string>
+    <string name="add_blocked_keyword">Anahtar kelime ekle</string>
+    <string name="add_blocked_keyword_hint">Engellenecek kelime veya ifade</string>
+    <string name="blocked_keyword_added">Anahtar kelime engellendi</string>
+    <string name="blocked_keyword_exists">Bu anahtar kelime zaten engellenmiş</string>
+    <string name="blocked_keyword_removed">Anahtar kelime kaldırıldı</string>
+    <string name="blocked_keyword_empty">Anahtar kelime boş olamaz</string>
+    <string name="no_blocked_keywords">Henüz engellenen anahtar kelime yok</string>
+    <string name="cd_add_blocked_keyword">Anahtar kelime engelle</string>
+    <string name="cd_remove_blocked_keyword">Anahtar kelimeyi kaldır</string>
+
     <string name="block_sender">Numarayı engelle</string>
     <string name="sender_blocked">Numara engellendi</string>
     <string name="cd_block_sender">Numarayı engelle</string>

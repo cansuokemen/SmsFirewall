@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,6 +42,7 @@ import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Fingerprint
@@ -53,6 +55,7 @@ import androidx.compose.material.icons.outlined.SettingsBrightness
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Vibration
+import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.Wallpaper
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
@@ -61,6 +64,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -130,6 +134,9 @@ fun SettingsScreen(
     blockedSenders: Set<String>,
     onAddBlockedSender: (String) -> Boolean,
     onRemoveBlockedSender: (String) -> Unit,
+    blockedKeywords: Set<String>,
+    onAddBlockedKeyword: (String) -> Boolean,
+    onRemoveBlockedKeyword: (String) -> Unit,
     spamRetentionDays: Int,
     onSpamRetentionChanged: (Int) -> Unit,
     soundEnabled: Boolean,
@@ -401,7 +408,7 @@ fun SettingsScreen(
                         SettingsSection(index = 0) {
                             SettingsDetailHeader(
                                 tab = SettingsTab.FILTER,
-                                summary = "Spam mesajlar $spamRetentionDays gun saklanir."
+                                summary = "Spam mesajlar $spamRetentionDays gun saklanir. ${blockedKeywords.size} anahtar kelime engelli."
                             )
                         }
                     }
@@ -410,6 +417,15 @@ fun SettingsScreen(
                             SpamRetentionCard(
                                 spamRetentionDays = spamRetentionDays,
                                 onSpamRetentionChanged = onSpamRetentionChanged
+                            )
+                        }
+                    }
+                    item {
+                        SettingsSection(index = 2) {
+                            BlockedKeywordsCard(
+                                blockedKeywords = blockedKeywords,
+                                onAddBlockedKeyword = onAddBlockedKeyword,
+                                onRemoveBlockedKeyword = onRemoveBlockedKeyword
                             )
                         }
                     }
@@ -1532,6 +1548,132 @@ private fun BlockedSenderItem(sender: String, onRemove: () -> Unit) {
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
+}
+
+@Composable
+private fun BlockedKeywordsCard(
+    blockedKeywords: Set<String>,
+    onAddBlockedKeyword: (String) -> Boolean,
+    onRemoveBlockedKeyword: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val blockedKeywordAddedText = stringResource(R.string.blocked_keyword_added)
+    val blockedKeywordExistsText = stringResource(R.string.blocked_keyword_exists)
+    val blockedKeywordRemovedText = stringResource(R.string.blocked_keyword_removed)
+    SectionHeader(
+        title = stringResource(R.string.blocked_keywords),
+        description = stringResource(R.string.blocked_keywords_description),
+        icon = Icons.Outlined.TextFields
+    )
+    BlockedKeywordInput(
+        blockedKeywords = blockedKeywords,
+        onAdd = { keyword ->
+            val added = onAddBlockedKeyword(keyword)
+            Toast.makeText(
+                context,
+                if (added) blockedKeywordAddedText else blockedKeywordExistsText,
+                Toast.LENGTH_SHORT
+            ).show()
+            added
+        },
+        onRemove = { keyword ->
+            onRemoveBlockedKeyword(keyword)
+            Toast.makeText(
+                context,
+                blockedKeywordRemovedText,
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    )
+}
+
+@Composable
+private fun BlockedKeywordInput(
+    blockedKeywords: Set<String>,
+    onAdd: (String) -> Boolean,
+    onRemove: (String) -> Unit
+) {
+    var input by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val blockedKeywordEmptyText = stringResource(R.string.blocked_keyword_empty)
+    val cdRemoveText = stringResource(R.string.cd_remove_blocked_keyword)
+
+    fun submit() {
+        val trimmed = input.trim()
+        if (trimmed.isBlank()) {
+            Toast.makeText(context, blockedKeywordEmptyText, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (onAdd(trimmed)) input = ""
+    }
+
+    Column {
+        OutlinedTextField(
+            value = input,
+            onValueChange = { input = it },
+            label = { Text(stringResource(R.string.add_blocked_keyword)) },
+            placeholder = { Text(stringResource(R.string.add_blocked_keyword_hint)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Text,
+                imeAction = ImeAction.Done,
+                autoCorrect = false
+            ),
+            keyboardActions = KeyboardActions(onDone = { submit() }),
+            trailingIcon = {
+                IconButton(onClick = { submit() }, enabled = input.isNotBlank()) {
+                    Icon(
+                        imageVector = Icons.Outlined.Add,
+                        contentDescription = stringResource(R.string.cd_add_blocked_keyword),
+                        tint = if (input.isNotBlank()) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (blockedKeywords.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                blockedKeywords.sorted().forEach { keyword ->
+                    InputChip(
+                        selected = false,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onRemove(keyword)
+                        },
+                        label = {
+                            Text(
+                                text = keyword,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        },
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = cdRemoveText,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    )
+                }
+            }
+        } else {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.no_blocked_keywords),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+        }
+    }
 }
 
 @Composable
